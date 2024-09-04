@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
-
+from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, LlamaRMSNorm
 
 DEV = torch.device('cuda:0')
-
 
 def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
     if type(module) in layers:
@@ -14,7 +13,6 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
             child, layers=layers, name=name + '.' + name1 if name != '' else name1
         ))
     return res
-
 
 
 def to_device(obj, device):

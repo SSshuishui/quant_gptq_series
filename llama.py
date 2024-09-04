@@ -15,7 +15,7 @@ def get_llama(model):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
     from transformers import LlamaForCausalLM
-    model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
+    model = LlamaForCausalLM.from_pretrained(model, device_map='auto', torch_dtype='auto')
     model.seqlen = 2048
     return model
 
@@ -61,6 +61,7 @@ def llama_sequential_gptq(model, dataloader, dev):
     )
     cache = {'i': 0, 'attention_mask': None}
 
+    
     class Catcher(nn.Module):
         def __init__(self, module):
             super().__init__()
@@ -70,9 +71,11 @@ def llama_sequential_gptq(model, dataloader, dev):
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
             cache['position_ids'] = kwargs['position_ids']
+
             raise ValueError
 
     layers[0] = Catcher(layers[0])
+
     for batch in dataloader:
         try:
             model(batch[0].to(dev))
@@ -85,10 +88,6 @@ def llama_sequential_gptq(model, dataloader, dev):
     model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
 
-    # 遍历模型的每一个参数并打印其所在的设备
-    for name, param in model.named_parameters():
-        print(f"Layer: {name}, Device: {param.device}")
-
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
@@ -96,8 +95,16 @@ def llama_sequential_gptq(model, dataloader, dev):
     print('Ready.')
 
     quantizers = {}
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
+        
     for i in range(len(layers)):
-        layer = layers[i].to(dev)
+        print(f'================={i}==================')
+        # layer = layers[i].to(dev)
+        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
+        inps = inps.to(hf_device_map[f'model.layers.{i}'])
+        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
+
         full = find_layers(layer)
 
         if args.true_sequential:
@@ -105,14 +112,13 @@ def llama_sequential_gptq(model, dataloader, dev):
                 ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
                 ['self_attn.o_proj'],
                 ['mlp.up_proj', 'mlp.gate_proj'],
-                ['mlp.down_proj']
+                ['mlp.down_proj'],
             ]
         else:
             sequential = [list(full.keys())]
        
         for names in sequential:
             subset = {n: full[n] for n in names}
-
             gptq = {}
             for name in subset:
                 gptq[name] = GPTQ(subset[name])
@@ -125,6 +131,7 @@ def llama_sequential_gptq(model, dataloader, dev):
                 def tmp(_, inp, out):
                     gptq[name].add_batch(inp[0].data, out.data)
                 return tmp
+
             handles = []
             for name in subset:
                 handles.append(subset[name].register_forward_hook(add_batch(name)))
@@ -847,8 +854,6 @@ def z_folding(model, quantizers):
         layer.input_layernorm.weight.data.mul_(quantizers[f"model.layers.{i}.self_attn.q_proj"].zeta.squeeze())
 
 
-
-
 if __name__ == '__main__':
     import argparse
     from utils.datautils import *
@@ -949,7 +954,7 @@ if __name__ == '__main__':
         quantizers = llama_sequential_gptq(model, dataloader, DEV)
         print(time.time() - tick)
         if args.save:
-            save_title = f"{args.model}_{args.dataset}_{args.method}_{groupsize}_{args.wbits}_seed{args.seed}"
+            save_title = f"{args.model}_{args.dataset}_{args.method}_{args.groupsize}_{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
