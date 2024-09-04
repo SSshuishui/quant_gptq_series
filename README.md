@@ -32,3 +32,10 @@ python llama.py --method claq --model ${MODEL_DIR} --dataset c4 --wbits 2 --true
 # Run Adaptive Precision + Outlier Reservation quantization to quantize the model to 2.12 bit and compute PPL results
 python llama.py --method claq --model ${MODEL_DIR} --dataset c4 --wbits 2 --true-sequential --act-order --outlierorder 2.05 --outlier_col_dynamic
 ```
+
+
+#### PB-LLM for LLaMA families
+```
+python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --wbits 2 --low_frac 0.5 --high_bit 8 --salient_metric hessian --save
+
+```

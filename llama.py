@@ -722,6 +722,163 @@ def llama_sequential_decoupleq(args, model, layers, dataloader, dev):
     model.config.use_cache = use_cache
     return quantizers
 
+@torch.no_grad()
+def llama_sequential_pbllm(model, dataloader, dev):
+    print("Starting ...")
+
+    for name, module in model.named_modules():
+        module.global_name = args.model + name
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+
+    if "opt" in args.model:
+        layers = model.model.decoder.layers
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(
+            dev
+        )
+        if (
+            hasattr(model.model.decoder, "project_out")
+            and model.model.decoder.project_out
+        ):
+            model.model.decoder.project_out = model.model.decoder.project_out.to(dev)
+        if (
+            hasattr(model.model.decoder, "project_in")
+            and model.model.decoder.project_in
+        ):
+            model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    elif "huggyllama" in args.model:
+        layers = model.model.layers
+        model.model.embed_tokens = model.model.embed_tokens.to(dev)
+        model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {"i": 0, "attention_mask": None}
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+
+        def forward(self, inp, **kwargs):
+            inps[cache["i"]] = inp
+            cache["i"] += 1
+            cache["attention_mask"] = kwargs["attention_mask"]
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    if "opt" in args.model:
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
+        if (
+            hasattr(model.model.decoder, "project_out")
+            and model.model.decoder.project_out
+        ):
+            model.model.decoder.project_out = model.model.decoder.project_out.cpu()
+        if (
+            hasattr(model.model.decoder, "project_in")
+            and model.model.decoder.project_in
+        ):
+            model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    elif "huggyllama" in args.model:
+        model.model.embed_tokens = model.model.embed_tokens.cpu()
+        model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache["attention_mask"]
+
+    print("Ready.")
+    plt_x = []
+    plt_error = []
+    for i in range(len(layers)):
+        layer = layers[i].to(dev)
+
+        subset = find_layers(layer)
+
+        gpts = {}
+        for name in subset:
+            if (
+                not (args.minlayer <= i < args.maxlayer and args.quant_only in name)
+            ) == (not args.invert):
+                continue
+            low_quantizer = LowQuantizer(
+                subset[name].weight,
+                method=args.low_quant_method,
+                groupsize=args.groupsize,
+            )
+            high_quantizer = HighQuantizer(
+                args.high_bit,
+                True,
+                False,
+                False,
+            )
+            gpts[name] = LowHighGPT(
+                subset[name],
+                low_quantizer,
+                high_quantizer,
+                salient_metric=args.salient_metric,
+                disable_gptq=args.disable_gptq,
+            )
+
+        def add_batch(name):
+            def tmp(_, inp, out):
+                gpts[name].add_batch(inp[0].data, out.data)
+
+            return tmp
+
+        handles = []
+        for name in gpts:
+            handles.append(subset[name].register_forward_hook(add_batch(name)))
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+        for h in handles:
+            h.remove()
+
+        for name in gpts:
+            print(i, name)
+            print("Quantizing ...")
+            info = gpts[name].fasterquant(
+                args.low_frac, percdamp=args.percdamp, blocksize=args.blocksize
+            )
+            gpts[name].free()
+            plt_x.append(f"{i}_{name}")
+            plt_error.append(info["error"])
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gpts
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+    if args.plot:
+        title = f"{args.model}_{args.dataset}_{args.low_quant_method}_{args.low_frac}_{args.high_bit}"
+        torch.save([plt_x, plt_error], "../output/" + title.replace("/", "_") + ".pkl")
+        import matplotlib.pyplot as plt
+
+        plt.plot(plt_error)
+        plt.xticks(range(1, len(plt_x) + 1), plt_x)
+        plt.title(title)
+        plt.savefig("../output/" + title.replace("/", "_") + ".jpg")
+
+    model.config.use_cache = use_cache
+
 
 @torch.no_grad()
 def llama_eval(model, testenc, dev):
@@ -938,6 +1095,11 @@ if __name__ == '__main__':
     parser.add_argument("--outlier_col_dynamic", action='store_true', help="outlier colomn dynamic.")
     parser.add_argument("--outlier_layer_dynamic", action='store_true', help="outlier layer dynamic.")
 
+    # For PB-LLM args
+    parser.add_argument("--low_frac", type=float, default=0, help="Target low frac.")
+    parser.add_argument("--high_bit", type=float, default=0, help="Max bit.")
+    parser.add_argument("--plot", action="store_true")
+
     args = parser.parse_args()
 
     model = get_llama(args.model)
@@ -954,7 +1116,7 @@ if __name__ == '__main__':
         quantizers = llama_sequential_gptq(model, dataloader, DEV)
         print(time.time() - tick)
         if args.save:
-            save_title = f"{args.model}_{args.dataset}_{args.method}_{args.groupsize}_{args.wbits}_seed{args.seed}"
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
@@ -967,7 +1129,7 @@ if __name__ == '__main__':
         quantizers = llama_sequential_billm(model, dataloader, DEV)
         print(time.time() - tick)
         if args.save:
-            save_title = f"{args.model}_{args.dataset}_{args.method}_{args.low_quant_method}_{groupsize}_{args.wbits}_{args.salient_metric}_seed{args.seed}"
+            save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
@@ -988,17 +1150,13 @@ if __name__ == '__main__':
                 quantizers,
                 f"./qmodel/{args.model}-W{args.wbits}-actorder_{args.act_order}-seed_{args.seed}-zfold_{args.use_zfold}-h_{args.salient_metric}/q_params.pt",
             )
-            print(
-                "qmodel saved at",
-                f"./qmodel/{args.model}-W{args.wbits}-actorder_{args.act_order}-seed_{args.seed}-zfold_{args.use_zfold}-h_{args.salient_metric}",
-            )
 
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
         tick = time.time()
         quantizers = llama_sequential_claq(model, dataloader, DEV, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes)
         print(time.time() - tick)
         if args.save:
-            save_title = f"{args.model}_{args.dataset}_{args.method}_{args.wbits}_seed{args.seed}"
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
@@ -1009,15 +1167,23 @@ if __name__ == '__main__':
     elif args.method == 'decoupleQ':
         tick = time.time()
         quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
+        print(time.time() - tick)
         if args.save:
-            save_title = f"{args.model}_{args.dataset}_{args.method}_{args.wbits}_seed{args.seed}"
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
-        print(time.time() - tick)
     
     elif args.method == 'pbllm':
-        pass
+        from gptq.pbllm import *
+        tick = time.time()
+        llama_sequential_pbllm(model, dataloader, device)
+        print(time.time() - tick)
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            llama_pack3(model, quantizers)
+            torch.save(model.state_dict(), args.save)
     
     elif args.method == 'quip':
         pass
