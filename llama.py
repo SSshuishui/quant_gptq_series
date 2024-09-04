@@ -748,7 +748,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
             and model.model.decoder.project_in
         ):
             model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
-    elif "huggyllama" in args.model:
+    elif "llama" in args.model:
         layers = model.model.layers
         model.model.embed_tokens = model.model.embed_tokens.to(dev)
         model.model.norm = model.model.norm.to(dev)
@@ -793,7 +793,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
             and model.model.decoder.project_in
         ):
             model.model.decoder.project_in = model.model.decoder.project_in.cpu()
-    elif "huggyllama" in args.model:
+    elif "llama" in args.model:
         model.model.embed_tokens = model.model.embed_tokens.cpu()
         model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
