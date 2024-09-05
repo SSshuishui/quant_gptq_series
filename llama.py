@@ -215,11 +215,16 @@ def llama_sequential_billm(model, dataloader, dev):
     position_ids = cache['position_ids']
 
     print("Ready.")
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
     
     for i in range(len(layers)):
-        layer = layers[i].to(dev)
-        subset = find_layers(layer)
+        print(f'================={i}==================')
+        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
+        inps = inps.to(hf_device_map[f'model.layers.{i}'])
+        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
 
+        subset = find_layers(layer)
         gptq = {}
         for name in subset:
             braq_quantizer = Binarization(
@@ -296,6 +301,9 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
             cache["i"] += 1
             cache["attention_mask"] = kwargs["attention_mask"]
             cache["position_ids"] = kwargs["position_ids"]
+
+            print("attention_mask: ", cache["attention_mask"])
+            print("position_ids: ", cache['position_ids'])
             raise ValueError
 
     layers[0] = Catcher(layers[0])
@@ -315,11 +323,18 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
     outs = torch.zeros_like(inps)
     attention_mask = cache["attention_mask"]
     position_ids = cache["position_ids"]
+
     print("Ready.")
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
 
     quantizers = {}
     for i in range(len(layers)):
-        layer = layers[i].to(dev)
+        print(f'================={i}==================')
+        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
+        inps = inps.to(hf_device_map[f'model.layers.{i}'])
+        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
+
         layer = layer.to(torch.float32)
         full = find_layers(layer)
 
@@ -722,6 +737,7 @@ def llama_sequential_decoupleq(args, model, layers, dataloader, dev):
     model.config.use_cache = use_cache
     return quantizers
 
+
 @torch.no_grad()
 def llama_sequential_pbllm(model, dataloader, dev):
     print("Starting ...")
@@ -881,6 +897,166 @@ def llama_sequential_pbllm(model, dataloader, dev):
 
 
 @torch.no_grad()
+def llama_sequential_quip(model, dataloader, dev, args):
+    print('Starting ...')
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.decoder.layers
+
+    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+    model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(
+        dev)
+    if hasattr(model.model.decoder,
+               'project_out') and model.model.decoder.project_out:
+        model.model.decoder.project_out = model.model.decoder.project_out.to(
+            dev)
+    if hasattr(model.model.decoder,
+               'project_in') and model.model.decoder.project_in:
+        model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros((args.nsamples, model.seqlen, model.config.hidden_size),
+                       dtype=dtype,
+                       device=dev)
+    cache = {'i': 0, 'attention_mask': None}
+
+    class Catcher(nn.Module):
+
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            cache['i'] += 1
+            cache['attention_mask'] = kwargs['attention_mask']
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+    model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu(
+    )
+    if hasattr(model.model.decoder,
+               'project_out') and model.model.decoder.project_out:
+        model.model.decoder.project_out = model.model.decoder.project_out.cpu()
+    if hasattr(model.model.decoder,
+               'project_in') and model.model.decoder.project_in:
+        model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache['attention_mask']
+
+    print('Ready.')
+
+    quantizers = {}
+    errors, Hmags, times = [], [], []
+    for i in tqdm(range(len(layers))):
+        layer = layers[i].to(dev)
+
+        subset = find_layers(layer)
+        quant_method = {}
+        # Initialize Quant Method and Compute H
+        for name in subset:
+            if args.quant == 'gptq':
+                quant_method[name] = GPTQ(subset[name])
+                quant_method[name].quantizer = Quantizer()
+                quant_method[name].quantizer.configure(args.wbits,
+                                               perchannel=True,
+                                               sym=False,
+                                               qfn=args.qfn,
+                                               mse=False)
+            elif args.quant == 'nearest':
+                quant_method[name] = Nearest(subset[name])
+                quant_method[name].quantizer = Quantizer()
+                quant_method[name].quantizer.configure(args.wbits,
+                                               perchannel=True,
+                                               sym=False,
+                                               qfn=args.qfn,
+                                               mse=False)
+            elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
+                quant_method[name] = Balance(subset[name])
+                quant_method[name].configure(
+                                    args.quant,
+                                    args.wbits, 
+                                    args.npasses,
+                                    unbiased=args.unbiased)
+                quant_method[name].quantizer = Quantizer()
+                quant_method[name].quantizer.configure(args.wbits,
+                                               perchannel=True,
+                                               sym=False,
+                                               qfn=args.qfn,
+                                               mse=False)
+
+        def add_batch(name):
+
+            def tmp(_, inp, out):
+                quant_method[name].add_batch(inp[0].data, out.data)
+
+            return tmp
+
+        handles = []
+        for name in subset:
+            handles.append(subset[name].register_forward_hook(add_batch(name)))
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0),
+                            attention_mask=attention_mask)[0]
+        for h in handles:
+            h.remove()
+        # (H / nsamples).to(torch.float32)
+        for name in subset:
+            quant_method[name].post_batch()
+
+        # Quantize Weights
+        for name in subset:
+            # print(i, name)
+            # print('Quantizing ...')
+            quant_method[name].preproc(
+                                preproc_gptqH=args.pre_gptqH, percdamp=args.percdamp,
+                                preproc_rescale=args.pre_rescale, 
+                                preproc_proj=args.pre_proj, preproc_proj_extra=args.pre_proj_extra)
+            if args.quant == 'gptq':
+                quant_method[name].fasterquant(groupsize=args.groupsize)
+            elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
+                quant_method[name].fasterquant(lazy_batch=args.lazy_batch)
+            elif args.quant == 'nearest':
+                quant_method[name].fasterquant()
+            quantizers['model.decoder.layers.%d.%s' %
+                        (i, name)] = quant_method[name].quantizer
+
+            errors.append(quant_method[name].error)
+            times.append(quant_method[name].time)
+            Hmags.append(quant_method[name].Hmag)
+            quant_method[name].free()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0),
+                            attention_mask=attention_mask)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del quant_method
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+    print(f'Total quant time: {sum(times):.2f}s')
+
+    return quantizers, errors
+
+
+@torch.no_grad()
 def llama_eval(model, testenc, dev):
     print('Evaluating ...')
 
@@ -928,9 +1104,14 @@ def llama_eval(model, testenc, dev):
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
 
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
+
     for i in range(len(layers)):
-        print(i)
-        layer = layers[i].to(dev)
+        print(f'================={i}==================')
+        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
+        inps = inps.to(hf_device_map[f'model.layers.{i}'])
+        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
         
         if args.nearest:
             subset = find_layers(layer)
@@ -1050,10 +1231,7 @@ if __name__ == '__main__':
         help='Percent of the average Hessian diagonal to use for dampening.'
     )
     parser.add_argument(
-        "--salient_metric",
-        type=str,
-        default="magnitude",
-        choices=["magnitude", "hessian"],
+        "--salient_metric", type=str, default="magnitude", choices=["magnitude", "hessian"],
     )
     parser.add_argument(
         '--nearest', action='store_true',
@@ -1087,6 +1265,9 @@ if __name__ == '__main__':
         '--static-groups', action='store_true',
         help='Whether to use static groups; recommended when using `--actorder` for more efficient inference.'
     )
+
+    # For Zfold args
+    parser.add_argument("--use_zfold", action='store_true', help="outlier colomn dynamic.")
 
     # For CLAQ args
     parser.add_argument("--outlier", type=float, default=0, help="Max and Min percentage of outliers keeped.")
@@ -1122,8 +1303,8 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), args.save)
    
     elif args.method == 'billm':
-        from bigptq import BRAGPTQ
-        from binary import Binarization 
+        from gptq.bigptq import BRAGPTQ
+        from gptq.binary import Binarization 
 
         tick = time.time()
         quantizers = llama_sequential_billm(model, dataloader, DEV)
@@ -1143,13 +1324,11 @@ if __name__ == '__main__':
         if args.use_zfold:
             z_folding(model, quantizers)
         if args.save:
-            model.save_pretrained(
-                f"./qmodel/{args.model}-W{args.wbits}-actorder_{args.act_order}-seed_{args.seed}-zfold_{args.use_zfold}-h_{args.salient_metric}"
-            )
-            torch.save(
-                quantizers,
-                f"./qmodel/{args.model}-W{args.wbits}-actorder_{args.act_order}-seed_{args.seed}-zfold_{args.use_zfold}-h_{args.salient_metric}/q_params.pt",
-            )
+            save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            llama_pack3(model, quantizers)
+            torch.save(model.state_dict(), args.save)
+
 
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
         tick = time.time()
@@ -1186,7 +1365,15 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), args.save)
     
     elif args.method == 'quip':
-        pass
+        from gptq.pbllm import *
+        tick = time.time()
+        llama_sequential_quip(model, dataloader, device, args)
+        print(time.time() - tick)
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            llama_pack3(model, quantizers)
+            torch.save(model.state_dict(), args.save)
 
 
     for dataset in ['wikitext2', 'ptb', 'c4']:

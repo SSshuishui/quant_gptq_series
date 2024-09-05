@@ -6,15 +6,14 @@ python llama.py --method gptq --model ${MODEL_DIR} --dataset c4 --wbits 4 --true
 
 
 #### Binarization for LLaMA families
-
 ```
-python llama.py --method billm --model ${MODEL_DIR} --dataset c4 --low_quant_method braq --blocksize 128 --salient_metric hessian
+python llama.py --method billm --model ${MODEL_DIR} --dataset c4 --low_quant_method braq --groupsize 128 --salient_metric hessian --save
 ```
 
 
 #### Z-fold for LLaMA families
 ```
-python llama.py --method zfold --model ${MODEL_DIR} --dataset c4 --wbits 4 --salient_metric hessian --act-order --use-zfold
+python llama.py --method zfold --model ${MODEL_DIR} --dataset c4 --wbits 4 --salient_metric hessian --act-order --use_zfold --save
 ```
 
 

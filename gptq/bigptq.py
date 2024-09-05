@@ -4,7 +4,7 @@ from exceptiongroup import catch
 import torch
 import torch.nn as nn
 import transformers
-from utils.structure import structural_guassian_distribution
+from .billm_utils import structural_guassian_distribution
 
 DEBUG = False
 
