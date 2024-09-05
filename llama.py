@@ -1,10 +1,7 @@
 import time
-
 import torch
 import torch.nn as nn
-
 from utils.modelutils import *
-from gptq.quant import *
 
 
 def get_llama(model):
@@ -100,10 +97,10 @@ def llama_sequential_gptq(model, dataloader, dev):
         
     for i in range(len(layers)):
         print(f'================={i}==================')
-        # layer = layers[i].to(dev)
-        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
-        inps = inps.to(hf_device_map[f'model.layers.{i}'])
-        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
 
         full = find_layers(layer)
 
@@ -220,9 +217,10 @@ def llama_sequential_billm(model, dataloader, dev):
     
     for i in range(len(layers)):
         print(f'================={i}==================')
-        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
-        inps = inps.to(hf_device_map[f'model.layers.{i}'])
-        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
 
         subset = find_layers(layer)
         gptq = {}
@@ -301,9 +299,6 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
             cache["i"] += 1
             cache["attention_mask"] = kwargs["attention_mask"]
             cache["position_ids"] = kwargs["position_ids"]
-
-            print("attention_mask: ", cache["attention_mask"])
-            print("position_ids: ", cache['position_ids'])
             raise ValueError
 
     layers[0] = Catcher(layers[0])
@@ -331,9 +326,10 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
     quantizers = {}
     for i in range(len(layers)):
         print(f'================={i}==================')
-        layer = layers[i].to(hf_device_map[f'model.layers.{i}'])
-        inps = inps.to(hf_device_map[f'model.layers.{i}'])
-        position_ids = position_ids.to(hf_device_map[f'model.layers.{i}'])
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
 
         layer = layer.to(torch.float32)
         full = find_layers(layer)
@@ -355,7 +351,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
             gptq = {}
             for name in subset:
                 gptq[name] = GPTQ(subset[name])
-                gptq[name].quantizer = Quantizer()
+                gptq[name].quantizer = ZFoldQuantizer()
                 gptq[name].quantizer.configure(args.wbits, perchannel=True, sym=args.sym, mse=False)
 
             def add_batch(name):
@@ -379,7 +375,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
                 H[dead, dead] = 1
                 percdamp = 0.01
                 damp = percdamp * torch.mean(torch.diag(H))
-                diag = torch.arange(gptq["self_attn.q_proj"].columns, device="cuda")
+                diag = torch.arange(gptq["self_attn.q_proj"].columns, device=f"cuda:{hf_device_map[f'model.layers.{i}']}")
                 H[diag, diag] += damp
 
                 # zfold share QKV
@@ -526,10 +522,17 @@ def llama_sequential_claq(model, dataloader, dev, mix_dict, outlier, outlier_col
     position_ids = cache['position_ids']
 
     print('Ready.')
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
 
     quantizers = {}
     for i in range(len(layers)):
-        layer = layers[i].to(dev)
+        print(f'================={i}==================')
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
+
         full = find_layers(layer)
 
         if args.true_sequential:
@@ -557,6 +560,7 @@ def llama_sequential_claq(model, dataloader, dev, mix_dict, outlier, outlier_col
                 def tmp(_, inp, out):
                     claq[name].add_batch(inp[0].data, out.data)
                 return tmp
+
             handles = []
             for name in subset:
                 handles.append(subset[name].register_forward_hook(add_batch(name)))
@@ -820,8 +824,17 @@ def llama_sequential_pbllm(model, dataloader, dev):
     print("Ready.")
     plt_x = []
     plt_error = []
+
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
+
     for i in range(len(layers)):
-        layer = layers[i].to(dev)
+        # layer = layers[i].to(dev)
+        print(f'================={i}==================')
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
 
         subset = find_layers(layer)
 
@@ -1173,8 +1186,11 @@ def llama_pack3(model, quantizers):
 @torch.no_grad()
 def z_folding(model, quantizers):
     layers = model.model.layers
+    hf_device_map = model.hf_device_map
+    print(hf_device_map)
     for i in range(len(layers)):
-        layer = layers[i].to("cuda")
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
         subset = find_layers(layer)
         for name in subset:
             print(i, name)
@@ -1292,6 +1308,7 @@ if __name__ == '__main__':
 
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
         from gptq.gptq import *
+        from gptq.quant import *
 
         tick = time.time()
         quantizers = llama_sequential_gptq(model, dataloader, DEV)
@@ -1305,6 +1322,7 @@ if __name__ == '__main__':
     elif args.method == 'billm':
         from gptq.bigptq import BRAGPTQ
         from gptq.binary import Binarization 
+        from gptq.quant import *
 
         tick = time.time()
         quantizers = llama_sequential_billm(model, dataloader, DEV)
@@ -1316,7 +1334,8 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), args.save)
 
     elif args.method == 'zfold' and args.wbits < 16 and not args.nearest:
-        from gptq_zfold import *
+        from gptq.gptq_zfold import *
+        from gptq.quant import *
 
         tick = time.time()
         quantizers = llama_sequential_zfold(model, dataloader, DEV, args.wbits, args.salient_metric, args.use_zfold)
@@ -1329,8 +1348,10 @@ if __name__ == '__main__':
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
 
-
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
+        from gptq.claq import *
+        from gptq.claq_quant import *
+
         tick = time.time()
         quantizers = llama_sequential_claq(model, dataloader, DEV, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes)
         print(time.time() - tick)
@@ -1355,6 +1376,8 @@ if __name__ == '__main__':
     
     elif args.method == 'pbllm':
         from gptq.pbllm import *
+        from gptq.quant import *
+
         tick = time.time()
         llama_sequential_pbllm(model, dataloader, device)
         print(time.time() - tick)

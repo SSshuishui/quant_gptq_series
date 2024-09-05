@@ -4,10 +4,8 @@ import time
 import torch
 import torch.nn as nn
 import transformers
-from zfold import *
-
-from quant import *
-
+from .zfold import *
+from .quant import *
 
 DEBUG = False
 

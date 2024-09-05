@@ -107,7 +107,7 @@ def find_zfold(use_hessian, weight, delta, zero_point, zfold, n_bits, H):
         for iters in range(n_iters):
             w_q = uniform_quantize(weight / (zfold + eps), delta, zero_point, n_bits)
             zfold = mmse(w_q.transpose(0, 1), weight.transpose(0, 1)).view(zfold.shape)
-            zfold = torch.where(zfold == 0.0, torch.ones(1).cuda(), zfold)
+            zfold = torch.where(zfold == 0.0, torch.ones(1, device=weight.device), zfold)
             if use_hessian:
                 delta, zero_point = init_quantization_scale_H(
                     weight / (zfold + eps),
@@ -161,7 +161,7 @@ def mmse(w_q, w):  # least squares := (w_qTw_q)^-1 (w_qTw) || (w_qTw)/(w_qTw_q)
     w_q = w_q.to(w.dtype)
     p = torch.bmm(w_q.unsqueeze(1), w.unsqueeze(2))
     q = torch.bmm(w_q.unsqueeze(1), w_q.unsqueeze(2))
-    q = 1e-10 * torch.ones(q.shape).cuda() + q
+    q = 1e-10 * torch.ones(q.shape, device=w.device) + q
     return p / q
 
 
