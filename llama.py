@@ -1222,8 +1222,8 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-        print(dataset)
-        llama_eval_gptq_zfold(args, model, testloader, DEV)
+            print(dataset)
+            llama_eval_gptq_zfold(args, model, testloader, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1245,8 +1245,8 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-        print(dataset)
-        llama_eval_billm(args, model, testloader, DEV)
+            print(dataset)
+            llama_eval_billm(args, model, testloader, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -1264,6 +1264,14 @@ if __name__ == '__main__':
         print(time.time() - tick)
         if args.use_zfold:
             z_folding(model, quantizers)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            print(dataset)
+            llama_eval_gptq_zfold(args, model, testloader, DEV)
+        
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
@@ -1283,29 +1291,8 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-        print(dataset)
-        llama_eval_gptq_zfold(args, model, testloader, DEV)
-
-        if args.save:
-            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
-            save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
-            torch.save(model.state_dict(), save_file)
-
-    elif args.method == 'slim':
-        pass
-    
-    elif args.method == 'decoupleQ':
-        tick = time.time()
-        quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
-        print(time.time() - tick)
-
-        for dataset in ['wikitext2', 'ptb', 'c4']:
-            dataloader, testloader = get_loaders(
-                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-            )
-        print(dataset)
-        llama_eval_pbllm(args, model, testloader, DEV)
+            print(dataset)
+            llama_eval_gptq_claq(args, model, testloader, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1326,12 +1313,30 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-        print(dataset)
-        llama_eval_pbllm(args, model, testloader, DEV)
+            print(dataset)
+            llama_eval_pbllm(args, model, testloader, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_lowfeac{args.low_frac}_highbit{args.high_bit}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+    
+    elif args.method == 'decoupleQ':
+        tick = time.time()
+        quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
+        print(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            print(dataset)
+            llama_eval_pbllm(args, model, testloader, DEV)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
     
     elif args.method == 'quip':
@@ -1345,6 +1350,9 @@ if __name__ == '__main__':
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), args.save)
 
+    elif args.method == 'slim':
+        pass
 
-    
+    elif arg.method == 'slim+':
+        pass
     
