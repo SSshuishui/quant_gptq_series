@@ -101,26 +101,8 @@ def get_c4(nsamples, seed, seqlen, model, tokenizer):
     return trainloader, valenc
 
 def get_loaders(name, nsamples=128, seed=0, seqlen=2048, model=''):
-    # cache_file=f'cache/{name}_{nsamples}_{seed}_{seqlen}_{model}.pt'
-    # try:
-    #     return torch.load(cache_file)
-    # except:
-    #     pass
 
     tokenizer = get_tokenizer(model)
-    
-    # if 'wikitext2' in name:
-    #     loaders= get_wikitext2(nsamples, seed, seqlen, model, tokenizer)
-    # if 'ptb' in name:
-    #     loaders= get_ptb(nsamples, seed, seqlen, model, tokenizer)
-    # if 'c4' in name:
-    #     loaders= get_c4(nsamples, seed, seqlen, model, tokenizer)
-    # print("loaders: ", loaders)
-    # directory='/'.join(cache_file.split('/')[:-1])
-    # if not os.path.exists(directory):
-    #     os.makedirs(directory)
-
-    # torch.save(loaders,cache_file)
     if 'wikitext2' in name:
         return get_wikitext2(nsamples, seed, seqlen, model, tokenizer)
     if 'ptb' in name:

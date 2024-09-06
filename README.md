@@ -37,4 +37,10 @@ python llama.py --method claq --model ${MODEL_DIR} --dataset c4 --wbits 2 --true
 ```
 python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --wbits 2 --low_frac 0.5 --high_bit 8 --salient_metric hessian --save
 
+python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --wbits 2 --low_frac 0.8 --high_bit 8 --salient_metric hessian --save
+
+python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --wbits 2 --low_frac 0.9 --high_bit 8 --salient_metric hessian --save
+
+python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --wbits 2 --low_frac 0.95 --high_bit 8 --salient_metric hessian --save
+
 ```

@@ -1,0 +1,632 @@
+nohup: ignoring input
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.85s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.14s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.25s/it]
+/home/user/anaconda3/envs/qllm/lib/python3.11/site-packages/datasets/table.py:1421: FutureWarning: promote has been superseded by promote_options='default'.
+  table = cls._concat_blocks(blocks, axis=0)
+The attention layers in this model are transitioning from computing the RoPE embeddings internally through `position_ids` (2D tensor with the indexes of the tokens), to using externally computed `position_embeddings` (Tuple of tensors, containing cos and sin). In v4.45 `position_ids` will be removed and `position_embeddings` will be mandatory.
+CUDA extension not installed.
+Starting ...
+Ready.
+{'model.embed_tokens': 0, 'model.layers.0': 0, 'model.layers.1': 0, 'model.layers.2': 0, 'model.layers.3': 0, 'model.layers.4': 0, 'model.layers.5': 0, 'model.layers.6': 0, 'model.layers.7': 0, 'model.layers.8': 0, 'model.layers.9': 0, 'model.layers.10': 1, 'model.layers.11': 1, 'model.layers.12': 1, 'model.layers.13': 1, 'model.layers.14': 1, 'model.layers.15': 1, 'model.layers.16': 1, 'model.layers.17': 1, 'model.layers.18': 1, 'model.layers.19': 1, 'model.layers.20': 1, 'model.layers.21': 1, 'model.layers.22': 2, 'model.layers.23': 2, 'model.layers.24': 2, 'model.layers.25': 2, 'model.layers.26': 2, 'model.layers.27': 2, 'model.layers.28': 2, 'model.layers.29': 2, 'model.layers.30': 2, 'model.layers.31': 2, 'model.norm': 2, 'model.rotary_emb': 2, 'lm_head': 2}
+=================0==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|0: QKV Share          | 0.977	| 26.47	| 10	|
+|0: self_attn.q_proj	| 0.000	| 0.80	| 0	|
+|0: self_attn.k_proj	| 0.000	| 0.80	| 0	|
+|0: self_attn.v_proj	| -0.000	| 0.80	| 0	|
+|0: self_attn.o_proj	| 0.003	| 17.59	| 21	|
+|0: mlp.gate_proj	| 0.086	| 2.12	| 0	|
+|0: mlp.up_proj	| 0.079	| 2.12	| 0	|
+|0: mlp.down_proj	| 0.003	| 62.97	| 13	|
+=================1==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|1: QKV Share          | 5.162	| 57.08	| 23	|
+|1: self_attn.q_proj	| 0.000	| 0.80	| 0	|
+|1: self_attn.k_proj	| 0.000	| 0.80	| 0	|
+|1: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|1: self_attn.o_proj	| 0.007	| 8.00	| 9	|
+|1: mlp.gate_proj	| 0.241	| 2.12	| 0	|
+|1: mlp.up_proj	| 0.212	| 2.12	| 0	|
+|1: mlp.down_proj	| 7.412	| 9.00	| 1	|
+=================2==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|2: QKV Share          | 9.702	| 43.06	| 17	|
+|2: self_attn.q_proj	| 0.000	| 0.80	| 0	|
+|2: self_attn.k_proj	| 0.000	| 0.80	| 0	|
+|2: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|2: self_attn.o_proj	| 0.008	| 23.97	| 30	|
+|2: mlp.gate_proj	| 0.490	| 2.12	| 0	|
+|2: mlp.up_proj	| 0.423	| 2.12	| 0	|
+|2: mlp.down_proj	| 0.029	| 103.45	| 22	|
+=================3==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|3: QKV Share          | 15.708	| 45.46	| 18	|
+|3: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|3: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|3: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|3: self_attn.o_proj	| 0.018	| 23.99	| 30	|
+|3: mlp.gate_proj	| 0.885	| 2.12	| 0	|
+|3: mlp.up_proj	| 0.750	| 2.12	| 0	|
+|3: mlp.down_proj	| 0.060	| 81.03	| 17	|
+=================4==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|4: QKV Share          | 14.396	| 36.03	| 14	|
+|4: self_attn.q_proj	| 0.000	| 0.80	| 0	|
+|4: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|4: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|4: self_attn.o_proj	| 0.032	| 11.19	| 13	|
+|4: mlp.gate_proj	| 1.310	| 2.12	| 0	|
+|4: mlp.up_proj	| 1.077	| 2.12	| 0	|
+|4: mlp.down_proj	| 0.135	| 108.07	| 23	|
+=================5==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|5: QKV Share          | 13.047	| 54.89	| 22	|
+|5: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|5: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|5: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|5: self_attn.o_proj	| 0.085	| 23.98	| 30	|
+|5: mlp.gate_proj	| 1.659	| 2.12	| 0	|
+|5: mlp.up_proj	| 1.338	| 2.12	| 0	|
+|5: mlp.down_proj	| 0.170	| 112.56	| 24	|
+=================6==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|6: QKV Share          | 15.500	| 36.02	| 14	|
+|6: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|6: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|6: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|6: self_attn.o_proj	| 0.087	| 23.99	| 30	|
+|6: mlp.gate_proj	| 2.054	| 2.12	| 0	|
+|6: mlp.up_proj	| 1.597	| 2.13	| 0	|
+|6: mlp.down_proj	| 0.259	| 63.05	| 13	|
+=================7==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|7: QKV Share          | 15.376	| 45.48	| 18	|
+|7: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|7: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|7: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|7: self_attn.o_proj	| 0.144	| 21.60	| 26	|
+|7: mlp.gate_proj	| 2.389	| 2.12	| 0	|
+|7: mlp.up_proj	| 1.862	| 2.13	| 0	|
+|7: mlp.down_proj	| 0.349	| 27.02	| 5	|
+=================8==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|8: QKV Share          | 15.288	| 31.31	| 12	|
+|8: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|8: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|8: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|8: self_attn.o_proj	| 0.214	| 23.21	| 28	|
+|8: mlp.gate_proj	| 2.480	| 2.13	| 0	|
+|8: mlp.up_proj	| 2.080	| 2.13	| 0	|
+|8: mlp.down_proj	| 0.424	| 126.06	| 27	|
+=================9==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|9: QKV Share          | 15.309	| 31.31	| 12	|
+|9: self_attn.q_proj	| 0.000	| 0.81	| 0	|
+|9: self_attn.k_proj	| 0.000	| 0.81	| 0	|
+|9: self_attn.v_proj	| 0.000	| 0.80	| 0	|
+|9: self_attn.o_proj	| 0.300	| 24.00	| 29	|
+|9: mlp.gate_proj	| 2.594	| 2.13	| 0	|
+|9: mlp.up_proj	| 2.267	| 2.13	| 0	|
+|9: mlp.down_proj	| 0.484	| 135.07	| 29	|
+=================10==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|10: QKV Share          | 15.010	| 31.87	| 12	|
+|10: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|10: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|10: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|10: self_attn.o_proj	| 0.373	| 23.59	| 28	|
+|10: mlp.gate_proj	| 2.719	| 2.16	| 0	|
+|10: mlp.up_proj	| 2.424	| 2.16	| 0	|
+|10: mlp.down_proj	| 0.566	| 138.27	| 30	|
+=================11==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|11: QKV Share          | 15.886	| 41.35	| 16	|
+|11: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|11: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|11: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|11: self_attn.o_proj	| 0.483	| 14.61	| 17	|
+|11: mlp.gate_proj	| 2.857	| 2.16	| 0	|
+|11: mlp.up_proj	| 2.607	| 2.16	| 0	|
+|11: mlp.down_proj	| 0.626	| 115.16	| 24	|
+=================12==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|12: QKV Share          | 16.778	| 41.34	| 16	|
+|12: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|12: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|12: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|12: self_attn.o_proj	| 0.558	| 21.10	| 25	|
+|12: mlp.gate_proj	| 2.970	| 2.16	| 0	|
+|12: mlp.up_proj	| 2.790	| 2.16	| 0	|
+|12: mlp.down_proj	| 0.749	| 138.14	| 30	|
+=================13==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|13: QKV Share          | 16.253	| 43.72	| 17	|
+|13: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|13: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|13: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|13: self_attn.o_proj	| 0.607	| 19.47	| 23	|
+|13: mlp.gate_proj	| 3.174	| 2.16	| 0	|
+|13: mlp.up_proj	| 3.037	| 2.16	| 0	|
+|13: mlp.down_proj	| 0.987	| 115.11	| 24	|
+=================14==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|14: QKV Share          | 16.409	| 44.08	| 17	|
+|14: self_attn.q_proj	| 0.000	| 1.05	| 0	|
+|14: self_attn.k_proj	| 0.000	| 1.25	| 0	|
+|14: self_attn.v_proj	| 0.000	| 1.25	| 0	|
+|14: self_attn.o_proj	| 0.648	| 28.54	| 22	|
+|14: mlp.gate_proj	| 3.386	| 3.29	| 0	|
+|14: mlp.up_proj	| 3.262	| 2.81	| 0	|
+|14: mlp.down_proj	| 1.132	| 155.75	| 30	|
+=================15==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|15: QKV Share          | 18.712	| 48.63	| 19	|
+|15: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|15: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|15: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|15: self_attn.o_proj	| 0.714	| 22.75	| 27	|
+|15: mlp.gate_proj	| 3.712	| 2.22	| 0	|
+|15: mlp.up_proj	| 3.615	| 2.23	| 0	|
+|15: mlp.down_proj	| 1.523	| 131.70	| 24	|
+=================16==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|16: QKV Share          | 19.816	| 50.98	| 20	|
+|16: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|16: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|16: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|16: self_attn.o_proj	| 0.879	| 24.37	| 29	|
+|16: mlp.gate_proj	| 4.234	| 2.16	| 0	|
+|16: mlp.up_proj	| 4.027	| 2.16	| 0	|
+|16: mlp.down_proj	| 1.976	| 143.63	| 30	|
+=================17==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|17: QKV Share          | 17.205	| 68.88	| 25	|
+|17: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|17: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|17: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|17: self_attn.o_proj	| 0.574	| 24.38	| 30	|
+|17: mlp.gate_proj	| 4.781	| 2.16	| 0	|
+|17: mlp.up_proj	| 4.372	| 2.16	| 0	|
+|17: mlp.down_proj	| 2.095	| 101.39	| 21	|
+=================18==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|18: QKV Share          | 18.469	| 67.29	| 20	|
+|18: self_attn.q_proj	| 0.000	| 1.25	| 0	|
+|18: self_attn.k_proj	| 0.000	| 1.24	| 0	|
+|18: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|18: self_attn.o_proj	| 0.632	| 20.32	| 24	|
+|18: mlp.gate_proj	| 5.465	| 2.16	| 0	|
+|18: mlp.up_proj	| 4.878	| 2.17	| 0	|
+|18: mlp.down_proj	| 2.552	| 78.48	| 16	|
+=================19==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|19: QKV Share          | 18.854	| 72.50	| 30	|
+|19: self_attn.q_proj	| 0.000	| 0.82	| 0	|
+|19: self_attn.k_proj	| 0.000	| 0.82	| 0	|
+|19: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|19: self_attn.o_proj	| 0.630	| 24.35	| 29	|
+|19: mlp.gate_proj	| 5.923	| 2.16	| 0	|
+|19: mlp.up_proj	| 5.222	| 2.16	| 0	|
+|19: mlp.down_proj	| 2.736	| 132.85	| 24	|
+=================20==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|20: QKV Share          | 19.473	| 83.39	| 27	|
+|20: self_attn.q_proj	| 0.000	| 1.25	| 0	|
+|20: self_attn.k_proj	| 0.000	| 1.25	| 0	|
+|20: self_attn.v_proj	| 0.000	| 0.82	| 0	|
+|20: self_attn.o_proj	| 0.745	| 17.88	| 21	|
+|20: mlp.gate_proj	| 6.354	| 2.16	| 0	|
+|20: mlp.up_proj	| 5.579	| 2.17	| 0	|
+|20: mlp.down_proj	| 3.433	| 124.61	| 26	|
+=================21==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|21: QKV Share          | 21.939	| 84.57	| 30	|
+|21: self_attn.q_proj	| 0.000	| 1.25	| 0	|
+|21: self_attn.k_proj	| 0.000	| 1.24	| 0	|
+|21: self_attn.v_proj	| 0.000	| 1.25	| 0	|
+|21: self_attn.o_proj	| 0.583	| 21.76	| 23	|
+|21: mlp.gate_proj	| 6.903	| 2.16	| 0	|
+|21: mlp.up_proj	| 5.950	| 2.17	| 0	|
+|21: mlp.down_proj	| 3.353	| 106.21	| 22	|
+=================22==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|22: QKV Share          | 22.623	| 95.78	| 30	|
+|22: self_attn.q_proj	| 0.000	| 1.27	| 0	|
+|22: self_attn.k_proj	| 0.000	| 1.27	| 0	|
+|22: self_attn.v_proj	| 0.000	| 1.26	| 0	|
+|22: self_attn.o_proj	| 0.825	| 18.89	| 14	|
+|22: mlp.gate_proj	| 7.357	| 3.05	| 0	|
+|22: mlp.up_proj	| 6.237	| 2.22	| 0	|
+|22: mlp.down_proj	| 3.553	| 136.42	| 24	|
+=================23==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|23: QKV Share          | 25.100	| 74.91	| 30	|
+|23: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|23: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|23: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|23: self_attn.o_proj	| 0.847	| 24.99	| 30	|
+|23: mlp.gate_proj	| 7.799	| 2.22	| 0	|
+|23: mlp.up_proj	| 6.740	| 2.23	| 0	|
+|23: mlp.down_proj	| 4.005	| 103.34	| 17	|
+=================24==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|24: QKV Share          | 24.109	| 92.15	| 30	|
+|24: self_attn.q_proj	| 0.000	| 0.84	| 0	|
+|24: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|24: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|24: self_attn.o_proj	| 0.993	| 14.97	| 17	|
+|24: mlp.gate_proj	| 8.316	| 2.22	| 0	|
+|24: mlp.up_proj	| 7.111	| 2.22	| 0	|
+|24: mlp.down_proj	| 4.146	| 117.67	| 24	|
+=================25==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|25: QKV Share          | 26.699	| 75.02	| 30	|
+|25: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|25: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|25: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|25: self_attn.o_proj	| 0.671	| 20.00	| 23	|
+|25: mlp.gate_proj	| 9.031	| 2.22	| 0	|
+|25: mlp.up_proj	| 7.742	| 2.23	| 0	|
+|25: mlp.down_proj	| 4.624	| 9.34	| 1	|
+=================26==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|26: QKV Share          | 27.937	| 74.95	| 30	|
+|26: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|26: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|26: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|26: self_attn.o_proj	| 2.330	| 20.02	| 23	|
+|26: mlp.gate_proj	| 9.630	| 2.22	| 0	|
+|26: mlp.up_proj	| 8.312	| 2.23	| 0	|
+|26: mlp.down_proj	| 5.347	| 105.64	| 21	|
+=================27==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|27: QKV Share          | 29.552	| 75.00	| 30	|
+|27: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|27: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|27: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|27: self_attn.o_proj	| 1.241	| 22.54	| 26	|
+|27: mlp.gate_proj	| 10.341	| 2.22	| 0	|
+|27: mlp.up_proj	| 9.100	| 2.23	| 0	|
+|27: mlp.down_proj	| 6.917	| 127.66	| 26	|
+=================28==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|28: QKV Share          | 32.572	| 74.96	| 30	|
+|28: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|28: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|28: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|28: self_attn.o_proj	| 1.581	| 18.37	| 21	|
+|28: mlp.gate_proj	| 11.008	| 2.22	| 0	|
+|28: mlp.up_proj	| 9.960	| 2.23	| 0	|
+|28: mlp.down_proj	| 9.816	| 130.22	| 26	|
+=================29==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|29: QKV Share          | 38.643	| 75.07	| 30	|
+|29: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|29: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|29: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|29: self_attn.o_proj	| 1.340	| 14.20	| 16	|
+|29: mlp.gate_proj	| 11.876	| 2.22	| 0	|
+|29: mlp.up_proj	| 10.830	| 2.23	| 0	|
+|29: mlp.down_proj	| 15.155	| 120.47	| 24	|
+=================30==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|30: QKV Share          | 40.764	| 75.05	| 30	|
+|30: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|30: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|30: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|30: self_attn.o_proj	| 2.004	| 19.22	| 22	|
+|30: mlp.gate_proj	| 12.870	| 2.22	| 0	|
+|30: mlp.up_proj	| 11.526	| 2.23	| 0	|
+|30: mlp.down_proj	| 47.567	| 43.41	| 8	|
+=================31==================
++---------------------------+------------------------+---------+----------------+
+|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|
++===========================+=========================+===========+=========+
+|31: QKV Share          | 24.924	| 75.05	| 30	|
+|31: self_attn.q_proj	| 0.000	| 0.85	| 0	|
+|31: self_attn.k_proj	| 0.000	| 0.84	| 0	|
+|31: self_attn.v_proj	| 0.000	| 0.84	| 0	|
+|31: self_attn.o_proj	| 4.497	| 3.35	| 3	|
+|31: mlp.gate_proj	| 12.220	| 2.22	| 0	|
+|31: mlp.up_proj	| 10.904	| 2.22	| 0	|
+|31: mlp.down_proj	| 253.706	| 52.93	| 10	|
+6589.2095675468445
+{'model.embed_tokens': 0, 'model.layers.0': 0, 'model.layers.1': 0, 'model.layers.2': 0, 'model.layers.3': 0, 'model.layers.4': 0, 'model.layers.5': 0, 'model.layers.6': 0, 'model.layers.7': 0, 'model.layers.8': 0, 'model.layers.9': 0, 'model.layers.10': 1, 'model.layers.11': 1, 'model.layers.12': 1, 'model.layers.13': 1, 'model.layers.14': 1, 'model.layers.15': 1, 'model.layers.16': 1, 'model.layers.17': 1, 'model.layers.18': 1, 'model.layers.19': 1, 'model.layers.20': 1, 'model.layers.21': 1, 'model.layers.22': 2, 'model.layers.23': 2, 'model.layers.24': 2, 'model.layers.25': 2, 'model.layers.26': 2, 'model.layers.27': 2, 'model.layers.28': 2, 'model.layers.29': 2, 'model.layers.30': 2, 'model.layers.31': 2, 'model.norm': 2, 'model.rotary_emb': 2, 'lm_head': 2}
+0 self_attn.q_proj
+0 self_attn.k_proj
+0 self_attn.v_proj
+0 self_attn.o_proj
+0 mlp.gate_proj
+0 mlp.up_proj
+0 mlp.down_proj
+1 self_attn.q_proj
+1 self_attn.k_proj
+1 self_attn.v_proj
+1 self_attn.o_proj
+1 mlp.gate_proj
+1 mlp.up_proj
+1 mlp.down_proj
+2 self_attn.q_proj
+2 self_attn.k_proj
+2 self_attn.v_proj
+2 self_attn.o_proj
+2 mlp.gate_proj
+2 mlp.up_proj
+2 mlp.down_proj
+3 self_attn.q_proj
+3 self_attn.k_proj
+3 self_attn.v_proj
+3 self_attn.o_proj
+3 mlp.gate_proj
+3 mlp.up_proj
+3 mlp.down_proj
+4 self_attn.q_proj
+4 self_attn.k_proj
+4 self_attn.v_proj
+4 self_attn.o_proj
+4 mlp.gate_proj
+4 mlp.up_proj
+4 mlp.down_proj
+5 self_attn.q_proj
+5 self_attn.k_proj
+5 self_attn.v_proj
+5 self_attn.o_proj
+5 mlp.gate_proj
+5 mlp.up_proj
+5 mlp.down_proj
+6 self_attn.q_proj
+6 self_attn.k_proj
+6 self_attn.v_proj
+6 self_attn.o_proj
+6 mlp.gate_proj
+6 mlp.up_proj
+6 mlp.down_proj
+7 self_attn.q_proj
+7 self_attn.k_proj
+7 self_attn.v_proj
+7 self_attn.o_proj
+7 mlp.gate_proj
+7 mlp.up_proj
+7 mlp.down_proj
+8 self_attn.q_proj
+8 self_attn.k_proj
+8 self_attn.v_proj
+8 self_attn.o_proj
+8 mlp.gate_proj
+8 mlp.up_proj
+8 mlp.down_proj
+9 self_attn.q_proj
+9 self_attn.k_proj
+9 self_attn.v_proj
+9 self_attn.o_proj
+9 mlp.gate_proj
+9 mlp.up_proj
+9 mlp.down_proj
+10 self_attn.q_proj
+10 self_attn.k_proj
+10 self_attn.v_proj
+10 self_attn.o_proj
+10 mlp.gate_proj
+10 mlp.up_proj
+10 mlp.down_proj
+11 self_attn.q_proj
+11 self_attn.k_proj
+11 self_attn.v_proj
+11 self_attn.o_proj
+11 mlp.gate_proj
+11 mlp.up_proj
+11 mlp.down_proj
+12 self_attn.q_proj
+12 self_attn.k_proj
+12 self_attn.v_proj
+12 self_attn.o_proj
+12 mlp.gate_proj
+12 mlp.up_proj
+12 mlp.down_proj
+13 self_attn.q_proj
+13 self_attn.k_proj
+13 self_attn.v_proj
+13 self_attn.o_proj
+13 mlp.gate_proj
+13 mlp.up_proj
+13 mlp.down_proj
+14 self_attn.q_proj
+14 self_attn.k_proj
+14 self_attn.v_proj
+14 self_attn.o_proj
+14 mlp.gate_proj
+14 mlp.up_proj
+14 mlp.down_proj
+15 self_attn.q_proj
+15 self_attn.k_proj
+15 self_attn.v_proj
+15 self_attn.o_proj
+15 mlp.gate_proj
+15 mlp.up_proj
+15 mlp.down_proj
+16 self_attn.q_proj
+16 self_attn.k_proj
+16 self_attn.v_proj
+16 self_attn.o_proj
+16 mlp.gate_proj
+16 mlp.up_proj
+16 mlp.down_proj
+17 self_attn.q_proj
+17 self_attn.k_proj
+17 self_attn.v_proj
+17 self_attn.o_proj
+17 mlp.gate_proj
+17 mlp.up_proj
+17 mlp.down_proj
+18 self_attn.q_proj
+18 self_attn.k_proj
+18 self_attn.v_proj
+18 self_attn.o_proj
+18 mlp.gate_proj
+18 mlp.up_proj
+18 mlp.down_proj
+19 self_attn.q_proj
+19 self_attn.k_proj
+19 self_attn.v_proj
+19 self_attn.o_proj
+19 mlp.gate_proj
+19 mlp.up_proj
+19 mlp.down_proj
+20 self_attn.q_proj
+20 self_attn.k_proj
+20 self_attn.v_proj
+20 self_attn.o_proj
+20 mlp.gate_proj
+20 mlp.up_proj
+20 mlp.down_proj
+21 self_attn.q_proj
+21 self_attn.k_proj
+21 self_attn.v_proj
+21 self_attn.o_proj
+21 mlp.gate_proj
+21 mlp.up_proj
+21 mlp.down_proj
+22 self_attn.q_proj
+22 self_attn.k_proj
+22 self_attn.v_proj
+22 self_attn.o_proj
+22 mlp.gate_proj
+22 mlp.up_proj
+22 mlp.down_proj
+23 self_attn.q_proj
+23 self_attn.k_proj
+23 self_attn.v_proj
+23 self_attn.o_proj
+23 mlp.gate_proj
+23 mlp.up_proj
+23 mlp.down_proj
+24 self_attn.q_proj
+24 self_attn.k_proj
+24 /home/user/anaconda3/envs/qllm/lib/python3.11/site-packages/transformers/modeling_utils.py:4713: FutureWarning: `_is_quantized_training_enabled` is going to be deprecated in transformers 4.39.0. Please use `model.hf_quantizer.is_trainable` instead
+  warnings.warn(
+self_attn.v_proj
+24 self_attn.o_proj
+24 mlp.gate_proj
+24 mlp.up_proj
+24 mlp.down_proj
+25 self_attn.q_proj
+25 self_attn.k_proj
+25 self_attn.v_proj
+25 self_attn.o_proj
+25 mlp.gate_proj
+25 mlp.up_proj
+25 mlp.down_proj
+26 self_attn.q_proj
+26 self_attn.k_proj
+26 self_attn.v_proj
+26 self_attn.o_proj
+26 mlp.gate_proj
+26 mlp.up_proj
+26 mlp.down_proj
+27 self_attn.q_proj
+27 self_attn.k_proj
+27 self_attn.v_proj
+27 self_attn.o_proj
+27 mlp.gate_proj
+27 mlp.up_proj
+27 mlp.down_proj
+28 self_attn.q_proj
+28 self_attn.k_proj
+28 self_attn.v_proj
+28 self_attn.o_proj
+28 mlp.gate_proj
+28 mlp.up_proj
+28 mlp.down_proj
+29 self_attn.q_proj
+29 self_attn.k_proj
+29 self_attn.v_proj
+29 self_attn.o_proj
+29 mlp.gate_proj
+29 mlp.up_proj
+29 mlp.down_proj
+30 self_attn.q_proj
+30 self_attn.k_proj
+30 self_attn.v_proj
+30 self_attn.o_proj
+30 mlp.gate_proj
+30 mlp.up_proj
+30 mlp.down_proj
+31 self_attn.q_proj
+31 self_attn.k_proj
+31 self_attn.v_proj
+31 self_attn.o_proj
+31 mlp.gate_proj
+31 mlp.up_proj
+31 mlp.down_proj
+Packing ...
+model.layers.0.self_attn.q_proj
+Traceback (most recent call last):
+  File "/home/zhaoxiang/llm_quantization/quant_gptq_series/llama.py", line 1345, in <module>
+    llama_pack3(model, quantizers)
+  File "/home/zhaoxiang/llm_quantization/quant_gptq_series/llama.py", line 1179, in llama_pack3
+    qlayers[name].pack(layers[name], quantizers[name].scale, quantizers[name].zero)
+  File "/home/zhaoxiang/llm_quantization/quant_gptq_series/gptq/quant.py", line 480, in pack
+    intweight = torch.round((linear.weight.data + self.zeros) / self.scales).to(torch.int)
+                             ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!
