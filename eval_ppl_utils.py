@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 @torch.no_grad()
-def llama_eval_gptq(args, model, testenc, dev):
+def llama_eval_gptq_zfold(args, model, testenc, dev):
     print('Evaluating ...')
 
     testenc = testenc.input_ids
@@ -80,7 +80,7 @@ def llama_eval_gptq(args, model, testenc, dev):
         torch.cuda.empty_cache()
         inps, outs = outs, inps
 
-    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)}']}"
+    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)-1}']}"
     if model.model.norm is not None:
         model.model.norm = model.model.norm.to(hf_device)
     model.lm_head = model.lm_head.to(hf_device)
@@ -183,7 +183,7 @@ def llama_eval_billm(args, model, testenc, dev):
         torch.cuda.empty_cache()
         inps, outs = outs, inps
 
-    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)}']}"
+    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)-1}']}"
     if model.model.norm is not None:
         model.model.norm = model.model.norm.to(hf_device)
     model.lm_head = model.lm_head.to(hf_device)
@@ -287,7 +287,7 @@ def llama_eval_pbllm(args, model, testenc, dev):
         torch.cuda.empty_cache()
         inps, outs = outs, inps
 
-    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)}']}"
+    hf_device = f"cuda:{hf_device_map[f'model.layers.{len(layers)-1}']}"
     if model.model.norm is not None:
         model.model.norm = model.model.norm.to(hf_device)
     model.lm_head = model.lm_head.to(hf_device)
@@ -309,4 +309,5 @@ def llama_eval_pbllm(args, model, testenc, dev):
     print(ppl.item())
 
     model.config.use_cache = use_cache
+
 

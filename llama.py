@@ -228,7 +228,7 @@ def llama_sequential_billm(model, dataloader, dev):
             braq_quantizer = Binarization(
                 subset[name].weight,
                 method=args.low_quant_method,
-                groupsize=args.groupsize,
+                groupsize=args.blocksize,
             )
             gptq[name] = BRAGPTQ(
                 subset[name],
@@ -254,7 +254,7 @@ def llama_sequential_billm(model, dataloader, dev):
             print("Quantizing ...")
             info = gptq[name].fasterquant(
                 percdamp=args.percdamp, 
-                blocksize=args.groupsize,
+                blocksize=args.blocksize,
             )
             gptq[name].free()
 
@@ -477,7 +477,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
 
 
 @torch.no_grad()
-def llama_sequential_claq(model, dataloader, dev, mix_dict, outlier, outlier_col_dynamic, outlier_layer_dynamic, outlierorder, inputhes):
+def llama_sequential_claq(model, dataloader, dev):
     print('Starting ...')
 
     use_cache = model.config.use_cache
@@ -551,7 +551,7 @@ def llama_sequential_claq(model, dataloader, dev, mix_dict, outlier, outlier_col
             claq = {}
             for name in subset:
                 claq[name] = CLAQ(subset[name])
-                claq[name].quantizer = Quantizer()
+                claq[name].quantizer = CLAQQuantizer()
                 claq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
@@ -573,7 +573,7 @@ def llama_sequential_claq(model, dataloader, dev, mix_dict, outlier, outlier_col
                 print(i, name)
                 print('Quantizing ...')
                 layername = '.'+str(i)+'.'+name
-                claq[name].fasterquant(args.wbits, layername, outlier, outlier_col_dynamic, outlier_layer_dynamic, outlierorder, inputhes, args.save, percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                claq[name].fasterquant(args.wbits, layername, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes, save_quant=args.save, blocksize=args.blocksize, percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['model.layers.%d.%s' % (i, name)] = claq[name].quantizer
                 claq[name].free()
 
@@ -863,7 +863,6 @@ def llama_sequential_pbllm(model, dataloader, dev):
         def add_batch(name):
             def tmp(_, inp, out):
                 gpts[name].add_batch(inp[0].data, out.data)
-
             return tmp
 
         handles = []
@@ -893,18 +892,18 @@ def llama_sequential_pbllm(model, dataloader, dev):
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
+        
     if args.plot:
         title = f"{args.model}_{args.dataset}_{args.low_quant_method}_{args.low_frac}_{args.high_bit}"
-        torch.save([plt_x, plt_error], "../output/" + title.replace("/", "_") + ".pkl")
+        torch.save([plt_x, plt_error], "./outputs/" + title.replace("/", "_") + ".pkl")
         import matplotlib.pyplot as plt
 
         plt.plot(plt_error)
         plt.xticks(range(1, len(plt_x) + 1), plt_x)
         plt.title(title)
-        plt.savefig("../output/" + title.replace("/", "_") + ".jpg")
+        plt.savefig("./outputs/" + title.replace("/", "_") + ".jpg")
 
     model.config.use_cache = use_cache
-
 
 
 @torch.no_grad()
@@ -1160,6 +1159,10 @@ if __name__ == '__main__':
         help='Groupsize to use for quantization; default uses full row.'
     )
     parser.add_argument(
+        "--blocksize", type=int, default=128,
+        help="Blocksize to use for adaptive mask selection.",
+    )
+    parser.add_argument(
         '--sym', action='store_true',
         help='Whether to perform symmetric quantization.'
     )
@@ -1208,7 +1211,7 @@ if __name__ == '__main__':
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
         from gptq.gptq import *
         from gptq.quant import *
-        from eval_ppl_utils import llama_eval_gptq
+        from eval_ppl_utils import llama_eval_gptq_zfold
 
 
         tick = time.time()
@@ -1220,7 +1223,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
         print(dataset)
-        llama_eval_gptq(args, model, testloader, DEV)
+        llama_eval_gptq_zfold(args, model, testloader, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1252,8 +1255,9 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'zfold' and args.wbits < 16 and not args.nearest:
-        from gptq.gptq_zfold import *
-        from gptq.quant import *
+        from gptq.gptq_zfold import GPTQ
+        from gptq.quant import ZFoldQuantizer
+        from gptq.zfold import *
 
         tick = time.time()
         quantizers = llama_sequential_zfold(model, dataloader, DEV, args.wbits, args.salient_metric, args.use_zfold)
@@ -1267,12 +1271,21 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
-        from gptq.claq import *
+        from gptq.claq import CLAQ
         from gptq.claq_quant import *
+        from eval_ppl_utils import llama_eval_gptq_zfold
 
         tick = time.time()
-        quantizers = llama_sequential_claq(model, dataloader, DEV, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes)
+        quantizers = llama_sequential_claq(model, dataloader, DEV)
         print(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+        print(dataset)
+        llama_eval_gptq_zfold(args, model, testloader, DEV)
+
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
@@ -1286,6 +1299,14 @@ if __name__ == '__main__':
         tick = time.time()
         quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
         print(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+        print(dataset)
+        llama_eval_pbllm(args, model, testloader, DEV)
+
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
@@ -1309,7 +1330,7 @@ if __name__ == '__main__':
         llama_eval_pbllm(args, model, testloader, DEV)
 
         if args.save:
-            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_lowfeac{args.low_frac}_highbit{args.high_bit}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             torch.save(model.state_dict(), save_file)
     

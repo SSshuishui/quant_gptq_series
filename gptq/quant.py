@@ -11,6 +11,10 @@ def quantize(x, scale, zero, maxq):
     q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
     return scale * (q - zero)
 
+def quantize_pbllm(x, scale, zero, maxq):
+    q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
+    return scale * (q - zero)
+
 
 class Quantizer(nn.Module):
 
@@ -326,7 +330,7 @@ class HighQuantizer(nn.Module):
 
     def quantize(self, x, blocki=None):
         if self.ready():
-            return quantize(x, self.scale, self.zero, self.maxq)
+            return quantize_pbllm(x, self.scale, self.zero, self.maxq)
         return x
 
     def enabled(self):
@@ -450,6 +454,9 @@ class ZFoldQuantizer(nn.Module):
 
     def ready(self):
         return torch.all(self.scale != 0)
+
+
+
 
 
 try:

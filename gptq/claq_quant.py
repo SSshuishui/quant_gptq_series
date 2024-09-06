@@ -73,16 +73,15 @@ def index_quantize(x, bit, q_value): # standard K-Means style
     q = power_quant(x,q_value.to(x.device))
     return q.float().to(device)'''
 
-class Quantizer(nn.Module):
+class CLAQQuantizer(nn.Module):
 
     def __init__(self, shape=1):
-        super(Quantizer, self).__init__()
+        super(CLAQQuantizer, self).__init__()
         #self.register_buffer('maxq', torch.tensor(0))
         self.register_buffer('scale', torch.zeros(shape))
         self.register_buffer('zero', torch.zeros(shape))
         self.register_buffer('kmvalue', torch.zeros(16))
         self.register_buffer('W_int', torch.zeros(shape))     
-        
 
     def configure(
         self,

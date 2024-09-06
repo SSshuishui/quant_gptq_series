@@ -6,7 +6,7 @@ import torch.nn as nn
 import transformers
 
 DEBUG = False
-OUTPUTMASK = 1
+OUTPUTMASK = 0
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -106,8 +106,8 @@ class LowHighGPT:
             # self.low_quantizer.calibrate(W[:,st:ed],mask[:,st:ed],groupi=groupi)
 
         if OUTPUTMASK:
-            if os.path.exists("./outputs/") == False:
-                os.mkdir("./outputs/")
+            if os.path.exists("./outputs") == False:
+                os.mkdir("./outputs")
             torch.save(
                 mask,
                 f"./outputs/mask_{low_frac}_{self.layer.global_name.replace('/','_')}.pkl",

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 import yaml
-from quant import *
+from .claq_quant import *
 
 
 DEBUG = False 
