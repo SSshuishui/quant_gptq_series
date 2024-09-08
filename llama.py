@@ -593,156 +593,6 @@ def llama_sequential_claq(model, dataloader, dev):
 
 
 @torch.no_grad()
-def llama_sequential_decoupleq(args, model, layers, dataloader, dev):
-    print("Starting ...")
-    cache = []
-
-    class Catcher(nn.Module):
-        def __init__(self, module):
-            super().__init__()
-            self.module = module
-
-        def forward(self, *args, **kwargs):
-            inputs = [list(args), kwargs]
-            cache.append(to_device(inputs, "cpu"))
-            raise ValueError
-
-    layers[0] = Catcher(layers[0])
-
-    use_cache = model.config.use_cache
-    model.config.use_cache = False
-    layers = model.model.layers
-
-    model.model.embed_tokens = model.model.embed_tokens.to(dev)
-    model.model.norm = model.model.norm.to(dev)
-
-    # model = model.to(dev)
-    model.eval()
-    torch.cuda.empty_cache()
-    model.requires_grad_(False)
-    masks = [None] * len(dataloader)
-
-    for batch in dataloader:
-        batch = to_device(batch, dev)
-        try:
-            model(batch)
-        except ValueError:
-            pass
-
-    del dataloader, batch
-    gc.collect()
-    layers[0] = layers[0].module
-    model = model.cpu()
-    inps = cache
-    torch.cuda.empty_cache()
-
-    print('Ready.')
-    shift = 0
-    quantizers = {}
-    outs = []
-
-    for i in range(len(layers)):
-        t_layer0 = time.time()
-        layer = layers[i]
-        full = find_layers(layer)
-        if args.true_sequential:
-            sequential = [
-                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
-                ['self_attn.o_proj'],
-                ['mlp.up_proj', 'mlp.gate_proj'],
-                ['mlp.down_proj']
-            ]
-        else:
-            sequential = [list(full.keys())]
-
-        for k, names in enumerate(sequential):
-            subset = {n: full[n] for n in names}
-            moq = {}
-            for name in subset:
-                moq[name] = decoupleQ(subset[name], name=f"layer.{i}.{name}")
-                moq[name].quantizer = Quantizer()
-                moq[name].quantizer.configure(args.qbits, perchannel=True, sym=not args.asym)
-                subset[name].mask = [None]
-
-            def add_batch(name):
-                def tmp(module, inp, out):
-                    moq[name].add_batch(inp[0].data, out.data, module.mask[0])
-
-                return tmp
-
-            handles = []
-            for name in subset:
-                handles.append(subset[name].register_forward_hook(add_batch(name)))
-
-            layer = layer.to(dev)
-            for idx, b in enumerate(inps):
-                b = to_device(b, dev)
-                out = layer(*(b[0]), **b[1])
-                if k == 0 and args.blockwise_minimize_lr > 0:
-                    os.makedirs("./tmp_blockwise", exist_ok=True)
-                    out = {"out": to_device(out, "cpu")}
-                    torch.save(out, f"./tmp_blockwise/out_{idx}.pth")
-                del out
-            layer = layer.cpu()
-
-            for h in handles:
-                h.remove()
-
-            for name in names:
-                del subset[name].mask
-                print(i, name)
-                print('Quantizing ...')
-                t1 = time.time()
-                torch.cuda.empty_cache()
-                scale_out, zero_out, w_int, loss = moq[name].startquant(
-                    dev=dev,
-                    groupsize=args.groupsize,
-                    symmetric=not args.asym,
-                    max_iter_num=args.max_iter_num,
-                    inner_iters_for_round=args.inner_iters_for_round,
-                    iters_before_round=args.iters_before_round,
-                    lr=args.lr,
-                    actorder=args.act_order,
-                    round_fn=args.round_fn,
-                )
-                t2 = time.time()
-                print(
-                    f"time cost {t2 - t1}, model.decoder.layers.{i + shift}.{name}.weight, loss is {loss.mean().item()}")
-                print()
-                scale_list = [k.cpu() for k in [scale_out, zero_out]]
-                quantizers[f"{i + shift}.{name}.weight"] = {
-                    "scales": scale_list, "weights": w_int.cpu(), "loss": loss.cpu()}
-                moq[name].free()
-                moq[name].quantizer.free()
-                del moq[name], scale_out, zero_out, w_int
-        outs = []
-        if args.blockwise_minimize_lr > 0:
-            t1 = time.time()
-            minimize_block(args, quantizers, layer, inps, dev, i + shift, masks)
-            shutil.rmtree("./tmp_blockwise")
-            print("time cost for block minimization:", time.time() - t1)
-
-        layer = layer.to(dev)
-        for b in inps:
-            b = to_device(b, dev)
-            outs.append(to_device(layer(*(b[0]), **b[1]), "cpu"))
-
-        layers[i] = layer.cpu()
-        del layer
-        del moq
-        torch.cuda.empty_cache()
-
-        for j in range(len(outs)):
-            inps[j][0][0] = outs[j][0]
-        del outs
-        print(f"quant layer {i} done! time cost {time.time() - t_layer0}")
-        print()
-    del inps
-    model.config.use_cache = use_cache
-    return quantizers
-
-
-@torch.no_grad()
 def llama_sequential_pbllm(model, dataloader, dev):
     print("Starting ...")
 
@@ -904,6 +754,158 @@ def llama_sequential_pbllm(model, dataloader, dev):
         plt.savefig("./outputs/" + title.replace("/", "_") + ".jpg")
 
     model.config.use_cache = use_cache
+
+
+@torch.no_grad()
+def llama_sequential_decoupleq(model, dataloader, dev):
+    print("Starting ...")
+    layers = model.model.layers
+    
+    cache = []
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+
+        def forward(self, *args, **kwargs):
+            inputs = [list(args), kwargs]
+            cache.append(to_device(inputs, "cpu"))
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.layers
+
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
+
+    # model = model.to(dev)
+    model.eval()
+    torch.cuda.empty_cache()
+    model.requires_grad_(False)
+    masks = [None] * len(dataloader)
+
+    for batch in dataloader:
+        batch = to_device(batch, dev)
+        try:
+            model(batch)
+        except ValueError:
+            pass
+
+    del dataloader, batch
+    gc.collect()
+    layers[0] = layers[0].module
+    model = model.cpu()
+    inps = cache
+    torch.cuda.empty_cache()
+
+    print('Ready.')
+    shift = 0
+    quantizers = {}
+    outs = []
+
+    for i in range(len(layers)):
+        t_layer0 = time.time()
+        layer = layers[i]
+        full = find_layers(layer)
+        if args.true_sequential:
+            sequential = [
+                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
+                ['self_attn.o_proj'],
+                ['mlp.up_proj', 'mlp.gate_proj'],
+                ['mlp.down_proj']
+            ]
+        else:
+            sequential = [list(full.keys())]
+
+        for k, names in enumerate(sequential):
+            subset = {n: full[n] for n in names}
+            moq = {}
+            for name in subset:
+                moq[name] = decoupleQ(subset[name], name=f"layer.{i}.{name}")
+                moq[name].quantizer = Quantizer()
+                moq[name].quantizer.configure(args.qbits, perchannel=True, sym=not args.asym)
+                subset[name].mask = [None]
+
+            def add_batch(name):
+                def tmp(module, inp, out):
+                    moq[name].add_batch(inp[0].data, out.data, module.mask[0])
+
+                return tmp
+
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+
+            layer = layer.to(dev)
+            for idx, b in enumerate(inps):
+                b = to_device(b, dev)
+                out = layer(*(b[0]), **b[1])
+                if k == 0 and args.blockwise_minimize_lr > 0:
+                    os.makedirs("./tmp_blockwise", exist_ok=True)
+                    out = {"out": to_device(out, "cpu")}
+                    torch.save(out, f"./tmp_blockwise/out_{idx}.pth")
+                del out
+            layer = layer.cpu()
+
+            for h in handles:
+                h.remove()
+
+            for name in names:
+                del subset[name].mask
+                print(i, name)
+                print('Quantizing ...')
+                t1 = time.time()
+                torch.cuda.empty_cache()
+                scale_out, zero_out, w_int, loss = moq[name].startquant(
+                    dev=dev,
+                    groupsize=args.groupsize,
+                    symmetric=not args.asym,
+                    max_iter_num=args.max_iter_num,
+                    inner_iters_for_round=args.inner_iters_for_round,
+                    iters_before_round=args.iters_before_round,
+                    lr=args.lr,
+                    actorder=args.act_order,
+                    round_fn=args.round_fn,
+                )
+                t2 = time.time()
+                print(
+                    f"time cost {t2 - t1}, model.decoder.layers.{i + shift}.{name}.weight, loss is {loss.mean().item()}")
+                print()
+                scale_list = [k.cpu() for k in [scale_out, zero_out]]
+                quantizers[f"{i + shift}.{name}.weight"] = {
+                    "scales": scale_list, "weights": w_int.cpu(), "loss": loss.cpu()}
+                moq[name].free()
+                moq[name].quantizer.free()
+                del moq[name], scale_out, zero_out, w_int
+        outs = []
+        if args.blockwise_minimize_lr > 0:
+            t1 = time.time()
+            minimize_block(args, quantizers, layer, inps, dev, i + shift, masks)
+            shutil.rmtree("./tmp_blockwise")
+            print("time cost for block minimization:", time.time() - t1)
+
+        layer = layer.to(dev)
+        for b in inps:
+            b = to_device(b, dev)
+            outs.append(to_device(layer(*(b[0]), **b[1]), "cpu"))
+
+        layers[i] = layer.cpu()
+        del layer
+        del moq
+        torch.cuda.empty_cache()
+
+        for j in range(len(outs)):
+            inps[j][0][0] = outs[j][0]
+        del outs
+        print(f"quant layer {i} done! time cost {time.time() - t_layer0}")
+        print()
+    del inps
+    model.config.use_cache = use_cache
+    return quantizers
 
 
 @torch.no_grad()
@@ -1341,9 +1343,18 @@ if __name__ == '__main__':
     
     elif args.method == 'quip':
         from gptq.pbllm import *
+
         tick = time.time()
         llama_sequential_quip(model, dataloader, device, args)
         print(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            print(dataset)
+            llama_eval_pbllm(args, model, testloader, DEV)
+
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"

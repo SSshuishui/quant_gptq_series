@@ -1,4 +1,19 @@
 
+## This project mainly integrates several LLMs quantization methods derived from GPTQ
+
+Include:
+| Methods | Quantize | Evaluate | Save |
+| :--- | ---: | :---: | :---: |
+| GPTQ | ✅ | ✅ | TODO ｜
+| PB-LLM | ✅ | ✅ | TODO ｜
+| BiLLM | ✅ | ✅ | TODO ｜
+| CLAQ | ✅ | ✅ | TODO ｜
+| Z-Fold | ✅ | ✅ | TODO ｜
+| decoupleQ | TODO | TODO | TODO ｜
+| Slim | TODO | TODO | TODO ｜
+| Slim Plus | TODO | TODO | TODO ｜
+| QuIP | TODO | TODO | TODO ｜
+
 #### GPTQ for LLaMA families
 ```
 python llama.py --method gptq --model ${MODEL_DIR} --dataset c4 --wbits 4 --true-sequential --act-order --save
@@ -43,4 +58,19 @@ python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_met
 
 python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_method xnor --low_frac 0.95 --high_bit 8 --salient_metric hessian --save
 
+```
+
+#### DecoupleQ for LLaMA families
+```
+python llama.py --model ${MODEL_DIR} --dataset c4 --true-sequential --act-order --new-eval \
+    --wbits 2 \
+    --group-size -1 \
+    --max-iter-num 4 \
+    --iters-before-round 200 \
+    --inner-iters-for-round 5 \
+    --blockwise-minimize-epoch 4 \
+    --round-fn gptq \
+    --blockwise-minimize-lr 1.0e-5 \
+    --train-LN \
+    --save
 ```
