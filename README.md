@@ -4,15 +4,15 @@
 Include:
 | Methods | Quantize | Evaluate | Save |
 | :--- | ---: | :---: | :---: 
-| GPTQ | ✅ | ✅ | TODO ｜
-| PB-LLM | ✅ | ✅ | TODO ｜
-| BiLLM | ✅ | ✅ | TODO ｜
-| CLAQ | ✅ | ✅ | TODO ｜
-| Z-Fold | ✅ | ✅ | TODO ｜
-| decoupleQ | TODO | TODO | TODO ｜
-| Slim | TODO | TODO | TODO ｜
-| Slim Plus | TODO | TODO | TODO ｜
-| QuIP | TODO | TODO | TODO ｜
+| GPTQ | ✅ | ✅ | TODO 
+| PB-LLM | ✅ | ✅ | TODO 
+| BiLLM | ✅ | ✅ | TODO 
+| CLAQ | ✅ | ✅ | TODO 
+| Z-Fold | ✅ | ✅ | TODO 
+| decoupleQ | TODO | TODO | TODO 
+| Slim | TODO | TODO | TODO 
+| Slim Plus | TODO | TODO | TODO 
+| QuIP | ✅ | ✅ | TODO 
 
 #### GPTQ for LLaMA families
 ```
@@ -82,4 +82,13 @@ python llama.py --method decoupleq --model ${MODEL_DIR} --dataset c4 --true-sequ
 python llama.py --method quip --model ${MODEL_DIR} --dataset c4
 # Run a quantization method with baseline processing
 python llama.py --method quip --model ${MODEL_DIR} --dataset c4 --wbits 4 --quant gptq --pre_gptqH --save 
+```
+
+#### SliM
+```
+# W2A16G128
+python llama.py --method slim --model ${MODEL_DIR} --dataset wikitext2 --wbits 4 --groupsize 128 --tasks piqa,arc_easy,arc_challenge,boolq,hellaswag,winogrande
+
+# W3A16G128
+python llama.py --method slim --model ${MODEL_DIR} --dataset wikitext2 --wbits 3 --groupsize 128 --tasks piqa,arc_easy,arc_challenge,boolq,hellaswag,winogrande
 ```

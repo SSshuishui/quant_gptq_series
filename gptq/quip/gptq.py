@@ -96,8 +96,8 @@ class QuIP_GPTQ(QuantMethod):
                 print(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        # print('time %.2f' % (time.time() - tick))
-        # print('error', torch.sum(Losses).item())
+        print('time %.2f' % (time.time() - tick))
+        print('error', torch.sum(Losses).item())
         self.time = time.time() - tick
 
         if isinstance(self.layer, transformers.Conv1D):
