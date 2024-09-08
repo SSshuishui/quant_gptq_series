@@ -3,7 +3,7 @@
 
 Include:
 | Methods | Quantize | Evaluate | Save |
-| :--- | ---: | :---: | :---: |
+| :--- | ---: | :---: | :---: 
 | GPTQ | ✅ | ✅ | TODO ｜
 | PB-LLM | ✅ | ✅ | TODO ｜
 | BiLLM | ✅ | ✅ | TODO ｜
@@ -62,7 +62,7 @@ python llama.py --method pbllm --model ${MODEL_DIR} --dataset c4 --low_quant_met
 
 #### DecoupleQ for LLaMA families
 ```
-python llama.py --model ${MODEL_DIR} --dataset c4 --true-sequential --act-order --new-eval \
+python llama.py --method decoupleq --model ${MODEL_DIR} --dataset c4 --true-sequential --act-order --new-eval \
     --wbits 2 \
     --group-size -1 \
     --max-iter-num 4 \
@@ -73,4 +73,13 @@ python llama.py --model ${MODEL_DIR} --dataset c4 --true-sequential --act-order 
     --blockwise-minimize-lr 1.0e-5 \
     --train-LN \
     --save
+```
+
+
+#### QuIP
+```
+# Compute full precision (FP16) results
+python llama.py --method quip --model ${MODEL_DIR} --dataset c4
+# Run a quantization method with baseline processing
+python llama.py --method quip --model ${MODEL_DIR} --dataset c4 --wbits 4 --quant gptq --pre_gptqH --save 
 ```

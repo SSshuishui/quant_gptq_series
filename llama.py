@@ -914,28 +914,32 @@ def llama_sequential_quip(model, dataloader, dev, args):
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    layers = model.model.decoder.layers
 
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(
-        dev)
-    if hasattr(model.model.decoder,
-               'project_out') and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.to(
-            dev)
-    if hasattr(model.model.decoder,
-               'project_in') and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    if "opt" in args.model:
+        layers = model.model.decoder.layers
+
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(dev)
+        if hasattr(model.model.decoder,
+                'project_out') and model.model.decoder.project_out:
+            model.model.decoder.project_out = model.model.decoder.project_out.to(
+                dev)
+        if hasattr(model.model.decoder,
+                'project_in') and model.model.decoder.project_in:
+            model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    elif "llama" in args.model:
+        layers = model.model.layers
+        model.model.embed_tokens = model.model.embed_tokens.to(dev)
+        model.model.norm = model.model.norm.to(dev)
+
     layers[0] = layers[0].to(dev)
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros((args.nsamples, model.seqlen, model.config.hidden_size),
-                       dtype=dtype,
-                       device=dev)
+    inps = torch.zeros((args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev)
+
     cache = {'i': 0, 'attention_mask': None}
 
     class Catcher(nn.Module):
-
         def __init__(self, module):
             super().__init__()
             self.module = module
@@ -944,6 +948,7 @@ def llama_sequential_quip(model, dataloader, dev, args):
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
+            cache['position_ids'] = kwargs['position_ids']
             raise ValueError
 
     layers[0] = Catcher(layers[0])
@@ -955,19 +960,23 @@ def llama_sequential_quip(model, dataloader, dev, args):
     layers[0] = layers[0].module
 
     layers[0] = layers[0].cpu()
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu(
-    )
-    if hasattr(model.model.decoder,
-               'project_out') and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.cpu()
-    if hasattr(model.model.decoder,
-               'project_in') and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    if "opt" in args.model:
+        model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+        model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
+        if hasattr(model.model.decoder,
+                'project_out') and model.model.decoder.project_out:
+            model.model.decoder.project_out = model.model.decoder.project_out.cpu()
+        if hasattr(model.model.decoder,
+                'project_in') and model.model.decoder.project_in:
+            model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    elif "llama" in args.model:
+        model.model.embed_tokens = model.model.embed_tokens.cpu()
+        model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
+    position_ids = cache['position_ids']
 
     print('Ready.')
 
@@ -981,40 +990,38 @@ def llama_sequential_quip(model, dataloader, dev, args):
         # Initialize Quant Method and Compute H
         for name in subset:
             if args.quant == 'gptq':
-                quant_method[name] = GPTQ(subset[name])
+                quant_method[name] = QuIP_GPTQ(subset[name])
                 quant_method[name].quantizer = Quantizer()
                 quant_method[name].quantizer.configure(args.wbits,
                                                perchannel=True,
                                                sym=False,
                                                qfn=args.qfn,
                                                mse=False)
-            elif args.quant == 'nearest':
-                quant_method[name] = Nearest(subset[name])
-                quant_method[name].quantizer = Quantizer()
-                quant_method[name].quantizer.configure(args.wbits,
-                                               perchannel=True,
-                                               sym=False,
-                                               qfn=args.qfn,
-                                               mse=False)
-            elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
-                quant_method[name] = Balance(subset[name])
-                quant_method[name].configure(
-                                    args.quant,
-                                    args.wbits, 
-                                    args.npasses,
-                                    unbiased=args.unbiased)
-                quant_method[name].quantizer = Quantizer()
-                quant_method[name].quantizer.configure(args.wbits,
-                                               perchannel=True,
-                                               sym=False,
-                                               qfn=args.qfn,
-                                               mse=False)
+            # elif args.quant == 'nearest':
+            #     quant_method[name] = Nearest(subset[name])
+            #     quant_method[name].quantizer = Quantizer()
+            #     quant_method[name].quantizer.configure(args.wbits,
+            #                                    perchannel=True,
+            #                                    sym=False,
+            #                                    qfn=args.qfn,
+            #                                    mse=False)
+            # elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
+            #     quant_method[name] = Balance(subset[name])
+            #     quant_method[name].configure(
+            #                         args.quant,
+            #                         args.wbits, 
+            #                         args.npasses,
+            #                         unbiased=args.unbiased)
+            #     quant_method[name].quantizer = Quantizer()
+            #     quant_method[name].quantizer.configure(args.wbits,
+            #                                    perchannel=True,
+            #                                    sym=False,
+            #                                    qfn=args.qfn,
+            #                                    mse=False)
 
         def add_batch(name):
-
             def tmp(_, inp, out):
                 quant_method[name].add_batch(inp[0].data, out.data)
-
             return tmp
 
         handles = []
@@ -1022,7 +1029,7 @@ def llama_sequential_quip(model, dataloader, dev, args):
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0),
-                            attention_mask=attention_mask)[0]
+                            attention_mask=attention_mask, position_ids=position_ids)[0]
         for h in handles:
             h.remove()
         # (H / nsamples).to(torch.float32)
@@ -1031,20 +1038,19 @@ def llama_sequential_quip(model, dataloader, dev, args):
 
         # Quantize Weights
         for name in subset:
-            # print(i, name)
-            # print('Quantizing ...')
+            print(i, name)
+            print('Quantizing ...')
             quant_method[name].preproc(
                                 preproc_gptqH=args.pre_gptqH, percdamp=args.percdamp,
                                 preproc_rescale=args.pre_rescale, 
                                 preproc_proj=args.pre_proj, preproc_proj_extra=args.pre_proj_extra)
             if args.quant == 'gptq':
                 quant_method[name].fasterquant(groupsize=args.groupsize)
-            elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
-                quant_method[name].fasterquant(lazy_batch=args.lazy_batch)
-            elif args.quant == 'nearest':
-                quant_method[name].fasterquant()
-            quantizers['model.decoder.layers.%d.%s' %
-                        (i, name)] = quant_method[name].quantizer
+            # elif args.quant in ['allbal','ldlq','ldlqRG','ldlbal_admm']:
+            #     quant_method[name].fasterquant(lazy_batch=args.lazy_batch)
+            # elif args.quant == 'nearest':
+            #     quant_method[name].fasterquant()
+            quantizers['model.decoder.layers.%d.%s' %(i, name)] = quant_method[name].quantizer
 
             errors.append(quant_method[name].error)
             times.append(quant_method[name].time)
@@ -1053,7 +1059,7 @@ def llama_sequential_quip(model, dataloader, dev, args):
 
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0),
-                            attention_mask=attention_mask)[0]
+                            attention_mask=attention_mask, position_ids=position_ids)[0]
 
         layers[i] = layer.cpu()
         del layer
@@ -1201,6 +1207,14 @@ if __name__ == '__main__':
     parser.add_argument("--plot", action="store_true")
     parser.add_argument("--disable_gptq", action="store_true")
 
+    # For QuIP args
+    parser.add_argument("--quant", type=str, default="gptq", help="QuIP Quantization methods")
+    parser.add_argument('--pre_gptqH', action='store_true', help='preprocessing')
+    parser.add_argument('--pre_rescale', action='store_true', help='preprocessing')
+    parser.add_argument('--pre_proj', action='store_true', help='preprocessing')
+    parser.add_argument('--pre_proj_extra', type=int, default=0, choices=[0, 1, 2], help='Extra options to control pre_proj step.')
+    parser.add_argument('--qfn', type=str, default='a', help='qfn: a is default, b is sym incoherent based')
+
     args = parser.parse_args()
 
     model = get_llama(args.model)
@@ -1342,7 +1356,8 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), save_file)
     
     elif args.method == 'quip':
-        from gptq.pbllm import *
+        from gptq.quip.gptq import QuIP_GPTQ
+        from gptq.quip.quant import *
 
         tick = time.time()
         llama_sequential_quip(model, dataloader, device, args)
