@@ -2,17 +2,17 @@
 ## This project mainly integrates several LLMs quantization methods derived from GPTQ
 
 Include:
-| Methods | Quantize | Evaluate | Save |
-| :--- | ---: | :---: | :---: 
-| GPTQ | ✅ | ✅ | TODO 
-| PB-LLM | ✅ | ✅ | TODO 
-| BiLLM | ✅ | ✅ | TODO 
-| CLAQ | ✅ | ✅ | TODO 
-| Z-Fold | ✅ | ✅ | TODO 
-| decoupleQ | TODO | TODO | TODO 
-| Slim | TODO | TODO | TODO 
-| Slim Plus | TODO | TODO | TODO 
-| QuIP | ✅ | ✅ | TODO 
+| Methods | Quantize | PPL Eval | Task Eval | Save |
+| :--- | ---: | :---: | :---: | :---: 
+| GPTQ | ✅ | ✅ | TODO | TODO 
+| PB-LLM | ✅ | ✅ | TODO | TODO 
+| BiLLM | ✅ | ✅ | TODO | TODO 
+| CLAQ | ✅ | ✅ | TODO | TODO 
+| Z-Fold | ✅ | ✅ | TODO | TODO 
+| decoupleQ | TODO | TODO | TODO | TODO 
+| Slim | TODO | TODO | TODO | TODO 
+| Slim Plus | TODO | TODO | TODO | TODO 
+| QuIP | ✅ | ✅ | TODO | TODO 
 
 #### GPTQ for LLaMA families
 ```

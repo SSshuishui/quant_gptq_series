@@ -18,9 +18,7 @@ SliM-LLM implementation of GPTQ
 '''
 
 class SliMGPTQ:
-    def __init__(
-        self, layer, quantizer, disable_gptq=False, layer_index=0, salient_block=-1, nonsalient_block=-1, 
-        bit_width=2):
+    def __init__(self, layer, quantizer, disable_gptq=False, layer_index=0, salient_block=-1, nonsalient_block=-1, bit_width=2):
         self.layer = layer
         self.dev = self.layer.weight.device
         W = layer.weight.data.clone()

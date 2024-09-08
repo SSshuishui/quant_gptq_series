@@ -1161,9 +1161,9 @@ def quant_sequential_slim(model, dataloader, dev):
             index += 1
             quantizer = SliM_Quantizer(
                 subset[name].weight,
-                method=args.low_quant_method,
+                method=args.wbits,
                 groupsize=groupsize,
-                metric = args.quantizer_matric,
+                metric = args.quantizer_metric,
                 lambda_salience=args.lambda_salience        
             )
             gptq[name] = SliMGPTQ(
@@ -1173,7 +1173,7 @@ def quant_sequential_slim(model, dataloader, dev):
                 layer_index=index,
                 salient_block = args.salient_block,
                 nonsalient_block = args.nonsalient_block,
-                bit_width = int(args.low_quant_method[0])
+                bit_width = int(args.wbits[0])
             )
 
         def add_batch(name):
@@ -1220,7 +1220,7 @@ def quant_sequential_slim(model, dataloader, dev):
                 saved_block_precision=saved_block_precision[i][name] if (saved_block_precision is not None) else None,
             )
             mixed_block_precision[i][name] = layer_block_precision
-            quantizers['model.layers.%d.%s' % (i, name)] = (scales.cpu(), zeros.cpu(), g_idx.cpu(), args.low_quant_method, args.groupsize)
+            quantizers['model.layers.%d.%s' % (i, name)] = (scales.cpu(), zeros.cpu(), g_idx.cpu(), args.wbits, args.groupsize)
 
             gptq[name].free()
 
@@ -1232,14 +1232,9 @@ def quant_sequential_slim(model, dataloader, dev):
         del layer
         del gptq
         torch.cuda.empty_cache()
-
         inps, outs = outs, inps
+        
     # print("The average bit-width is:  ", sum(mean_bit_width) / len(mean_bit_width), " bits")
-    if saved_block_precision is None:
-        net = args.model.split("/")[-1]
-        save_path = os.path.join(f'./block_precision_{args.groupsize}_{args.low_quant_method}/',f'{net}.pt')
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        torch.save(mixed_block_precision, save_path)
     model.config.use_cache = use_cache
     return quantizers
 
@@ -1329,7 +1324,7 @@ if __name__ == '__main__':
         help='Whether to run the RTN baseline.'
     ) 
     parser.add_argument(
-        '--wbits', type=int, default=16, choices=[2, 3, 4, 8, 16],
+        '--wbits', type=int, default=16, choices=[2, 3, 4, 5, 6, 7, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
     )
     parser.add_argument(
@@ -1360,6 +1355,8 @@ if __name__ == '__main__':
         '--static-groups', action='store_true',
         help='Whether to use static groups; recommended when using `--actorder` for more efficient inference.'
     )
+    parser.add_argument("--tasks",  type=str, default="", help="Task datasets Evaluate")
+
 
     # For Zfold args
     parser.add_argument("--use_zfold", action='store_true', help="outlier colomn dynamic.")
@@ -1385,8 +1382,15 @@ if __name__ == '__main__':
     parser.add_argument('--pre_proj_extra', type=int, default=0, choices=[0, 1, 2], help='Extra options to control pre_proj step.')
     parser.add_argument('--qfn', type=str, default='a', help='qfn: a is default, b is sym incoherent based')
 
-    args = parser.parse_args()
+    # For Slim args
+    parser.add_argument("--salient_block", type=int, default=-1)
+    parser.add_argument("--nonsalient_block", type=int, default=-1)
+    parser.add_argument("--quantizer_metric", type=str, default="mse", help="quantizer parameter determination metric")
+    parser.add_argument("--lambda_salience", type=float, default=1, help="Percent of the average Hessian diagonal to use for dampening.")
 
+
+    args = parser.parse_args()
+    
     model = get_llama(args.model)
     model.eval()
 

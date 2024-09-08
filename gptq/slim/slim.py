@@ -44,7 +44,7 @@ def ssim(x, y, C1=0.01**2, C2=0.03**2):
 
 
 class SliM_Quantizer(nn.Module):
-    def __init__(self, weight, method="2bit", groupsize=-1, norm=2.4, sym=True, maxshrink=.8, metric='mse', lambda_salience=1):
+    def __init__(self, weight, method=2, groupsize=-1, norm=2.4, sym=True, maxshrink=.8, metric='mse', lambda_salience=1):
         super().__init__()
         oc,ic=weight.shape
         if groupsize==-1:
@@ -63,17 +63,16 @@ class SliM_Quantizer(nn.Module):
 
     def fit(self, w, Hinv1, bit_width=0):
         if bit_width > 0 and bit_width < 16:
-            self.method = str(bit_width)+'bit'
+            self.method = bit_width
         else:
             return
-        # print(self.method, bit_width)
 
-        if self.method=="1bit":
+        if self.method==1:
             scale, zero = binary_scale(w)
             maxq = None
-        # print("this block bit_width: ", self.method)
+        print("this block bit_width: ", self.method)
         else:
-            bits = int(self.method[0])
+            bits = self.method
             perchannel = True
             weight = True
             dev = w.device
@@ -183,7 +182,7 @@ class SliM_Quantizer(nn.Module):
 
     def quantize(self, w, bit_width=0):
 
-        if self.method=="1bit":
+        if self.method==1:
             q = binary(w, self.scale, self.zero)
             return q
         q = normal_quantize(w, self.scale.squeeze(), self.zero.squeeze(), self.maxq)

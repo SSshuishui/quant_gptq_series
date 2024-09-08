@@ -510,3 +510,58 @@ def llama_eval_slim(model, testenc, dev,  dataset: str, log_wandb: bool = False)
     print(f"Perplexity: {ppl.item():3f}")
 
     model.config.use_cache = use_cache
+
+
+@torch.no_grad()
+def zeroshot_evaluate(model, args, dev):
+    results = {}
+    limit = -1
+
+    if "opt" in args.model.lower():
+        model.model.decoder = model.model.decoder.to(dev)
+    elif "llama" in args.model.lower() or "mixtral" in args.model.lower():
+        model = model.to(dev)
+    elif "falcon" in args.model.lower():
+        model.transformer = model.transformer.to(model.device)
+
+    if args.tasks != "":
+        from model_utils.LMClass import LMClass
+        lm = LMClass(model, args)
+
+        t_results = evaluator.simple_evaluate(
+            lm,
+            tasks=args.tasks,
+            num_fewshot=0,
+            limit=None if limit == -1 else limit,
+        )
+        results.update(t_results)
+        pprint(results)
+        # for test of MMLU
+        if 'hendrycksTest' in args.tasks:
+            all_cors = []
+            all_cors_norm = []
+            subcat_cors = {subcat: [] for subcat_lists in subcategories.values() for subcat in subcat_lists}
+            cat_cors = {cat: [] for cat in categories}
+            cat_cors_norm = {cat: [] for cat in categories}
+            for key in t_results['results'].keys():
+                if not 'hendrycksTest' in key:
+                    continue
+                subject = key.split('-')[-1]
+                cors = t_results['results'][key]['acc']
+                cors_norm = t_results['results'][key]['acc_norm']
+                subcats = subcategories[subject]
+                for subcat in subcats:
+                    subcat_cors[subcat].append(cors)
+                    for key in categories.keys():
+                        if subcat in categories[key]:
+                            cat_cors[key].append(cors)
+                            cat_cors_norm[key].append(cors_norm)
+                    all_cors.append(cors)
+                    all_cors_norm.append(cors_norm)
+                    
+            for cat in cat_cors:
+                cat_acc = np.mean(cat_cors[cat])
+                print("Average accuracy {:.4f} - {}".format(cat_acc, cat))
+            weighted_acc = np.mean(all_cors)
+            print("Average accuracy: {:.4f}".format(weighted_acc))               
+    print(results)
