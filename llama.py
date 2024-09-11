@@ -2,6 +2,8 @@ import time
 import torch
 import torch.nn as nn
 from utils.modelutils import *
+from utils.logutils import create_logger
+from pathlib import Path
 
 
 def get_llama(model):
@@ -24,10 +26,10 @@ def get_llama(model):
 
 @torch.no_grad() 
 def llama_nearest(model, dev):
-    print("RTN Quantization ...")
+    logger.info("RTN Quantization ...")
     layers = model.model.layers
     for i in range(len(layers)):
-        print(i)
+        logger.info(i)
         layer = layers[i].to(dev)
         subset = find_layers(layer)
         for name in subset:
@@ -47,7 +49,7 @@ def llama_nearest(model, dev):
 
 @torch.no_grad()
 def llama_sequential_gptq(model, dataloader, dev):
-    print('Starting ...')
+    logger.info('Starting ...')
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
@@ -94,14 +96,14 @@ def llama_sequential_gptq(model, dataloader, dev):
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
 
-    print('Ready.')
+    logger.info('Ready.')
 
     quantizers = {}
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
         
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -143,8 +145,8 @@ def llama_sequential_gptq(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                print(i, name)
-                print('Quantizing ...')
+                logger.info(i, name)
+                logger.info('Quantizing ...')
                 gptq[name].fasterquant(
                     percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, static_groups=args.static_groups
                 )
@@ -168,7 +170,7 @@ def llama_sequential_gptq(model, dataloader, dev):
 
 @torch.no_grad()
 def llama_sequential_billm(model, dataloader, dev):
-    print("Starting ...")
+    logger.info("Starting ...")
 
     for name, module in model.named_modules():
         module.global_name = args.model + name
@@ -216,12 +218,12 @@ def llama_sequential_billm(model, dataloader, dev):
     attention_mask = cache["attention_mask"]
     position_ids = cache['position_ids']
 
-    print("Ready.")
+    logger.info("Ready.")
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
     
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -255,8 +257,8 @@ def llama_sequential_billm(model, dataloader, dev):
             h.remove()
 
         for name in gptq:
-            print(i, name)
-            print("Quantizing ...")
+            logger.info(i, name)
+            logger.info("Quantizing ...")
             info = gptq[name].fasterquant(
                 percdamp=args.percdamp, 
                 blocksize=args.blocksize,
@@ -278,7 +280,7 @@ def llama_sequential_billm(model, dataloader, dev):
 
 @torch.no_grad()
 def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zfold):
-    print("Starting ...")
+    logger.info("Starting ...")
 
     use_hessian = (salient_metric == 'hessian')
     use_cache = model.config.use_cache
@@ -324,13 +326,13 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
     attention_mask = cache["attention_mask"]
     position_ids = cache["position_ids"]
 
-    print("Ready.")
+    logger.info("Ready.")
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     quantizers = {}
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -403,10 +405,10 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
                     gptq[name].quantizer.zeta = qkv_zfold.unsqueeze(1)
                     gptq[name].quantizer.maxq = maxq
                 toggle_share_qkv = True
-                print("+---------------------------+------------------------+---------+----------------+")
-                print("|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|")
-                print("+===========================+=========================+===========+=========+")
-                print(f"|{i}: QKV Share          | {diff:.3f}\t| {(time.time() - tick):.2f}\t| {alternating_iter}\t|")
+                logger.info("+---------------------------+------------------------+---------+----------------+")
+                logger.info("|           Layer           |   delta_W@H@delta_W.T  |   time  | alternaint iter|")
+                logger.info("+===========================+=========================+===========+=========+")
+                logger.info(f"|{i}: QKV Share          | {diff:.3f}\t| {(time.time() - tick):.2f}\t| {alternating_iter}\t|")
 
             for name in subset:
                 if use_zfold:
@@ -483,7 +485,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
 
 @torch.no_grad()
 def llama_sequential_claq(model, dataloader, dev):
-    print('Starting ...')
+    logger.info('Starting ...')
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
@@ -526,13 +528,13 @@ def llama_sequential_claq(model, dataloader, dev):
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
 
-    print('Ready.')
+    logger.info('Ready.')
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     quantizers = {}
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -575,8 +577,8 @@ def llama_sequential_claq(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                print(i, name)
-                print('Quantizing ...')
+                logger.info(i, name)
+                logger.info('Quantizing ...')
                 layername = '.'+str(i)+'.'+name
                 claq[name].fasterquant(args.wbits, layername, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes, save_quant=args.save, blocksize=args.blocksize, percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['model.layers.%d.%s' % (i, name)] = claq[name].quantizer
@@ -599,7 +601,7 @@ def llama_sequential_claq(model, dataloader, dev):
 
 @torch.no_grad()
 def llama_sequential_pbllm(model, dataloader, dev):
-    print("Starting ...")
+    logger.info("Starting ...")
 
     for name, module in model.named_modules():
         module.global_name = args.model + name
@@ -678,15 +680,15 @@ def llama_sequential_pbllm(model, dataloader, dev):
     attention_mask = cache["attention_mask"]
     position_ids = cache["position_ids"]
 
-    print("Ready.")
+    logger.info("Ready.")
     plt_x = []
     plt_error = []
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -729,8 +731,8 @@ def llama_sequential_pbllm(model, dataloader, dev):
             h.remove()
 
         for name in gpts:
-            print(i, name)
-            print("Quantizing ...")
+            logger.info(i, name)
+            logger.info("Quantizing ...")
             info = gpts[name].fasterquant(
                 args.low_frac, percdamp=args.percdamp, blocksize=args.blocksize
             )
@@ -763,7 +765,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
 
 @torch.no_grad()
 def llama_sequential_decoupleq(model, dataloader, dev):
-    print("Starting ...")
+    logger.info("Starting ...")
     layers = model.model.layers
     
     cache = []
@@ -807,7 +809,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
     inps = cache
     torch.cuda.empty_cache()
 
-    print('Ready.')
+    logger.info('Ready.')
     shift = 0
     quantizers = {}
     outs = []
@@ -861,8 +863,8 @@ def llama_sequential_decoupleq(model, dataloader, dev):
 
             for name in names:
                 del subset[name].mask
-                print(i, name)
-                print('Quantizing ...')
+                logger.info(i, name)
+                logger.info('Quantizing ...')
                 t1 = time.time()
                 torch.cuda.empty_cache()
                 scale_out, zero_out, w_int, loss = moq[name].startquant(
@@ -877,9 +879,9 @@ def llama_sequential_decoupleq(model, dataloader, dev):
                     round_fn=args.round_fn,
                 )
                 t2 = time.time()
-                print(
+                logger.info(
                     f"time cost {t2 - t1}, model.decoder.layers.{i + shift}.{name}.weight, loss is {loss.mean().item()}")
-                print()
+                logger.info()
                 scale_list = [k.cpu() for k in [scale_out, zero_out]]
                 quantizers[f"{i + shift}.{name}.weight"] = {
                     "scales": scale_list, "weights": w_int.cpu(), "loss": loss.cpu()}
@@ -891,7 +893,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
             t1 = time.time()
             minimize_block(args, quantizers, layer, inps, dev, i + shift, masks)
             shutil.rmtree("./tmp_blockwise")
-            print("time cost for block minimization:", time.time() - t1)
+            logger.info("time cost for block minimization:", time.time() - t1)
 
         layer = layer.to(dev)
         for b in inps:
@@ -906,8 +908,8 @@ def llama_sequential_decoupleq(model, dataloader, dev):
         for j in range(len(outs)):
             inps[j][0][0] = outs[j][0]
         del outs
-        print(f"quant layer {i} done! time cost {time.time() - t_layer0}")
-        print()
+        logger.info(f"quant layer {i} done! time cost {time.time() - t_layer0}")
+        logger.info()
     del inps
     model.config.use_cache = use_cache
     return quantizers
@@ -915,7 +917,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
 
 @torch.no_grad()
 def llama_sequential_quip(model, dataloader, dev):
-    print('Starting ...')
+    logger.info('Starting ...')
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
@@ -983,16 +985,16 @@ def llama_sequential_quip(model, dataloader, dev):
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
 
-    print('Ready.')
+    logger.info('Ready.')
 
     quantizers = {}
     errors, Hmags, times = [], [], []
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -1030,8 +1032,8 @@ def llama_sequential_quip(model, dataloader, dev):
 
         # Quantize Weights
         for name in subset:
-            print(i, name)
-            print('Quantizing ...')
+            logger.info(i, name)
+            logger.info('Quantizing ...')
             quant_method[name].preproc(
                                 preproc_gptqH=args.pre_gptqH, percdamp=args.percdamp,
                                 preproc_rescale=args.pre_rescale, 
@@ -1058,14 +1060,14 @@ def llama_sequential_quip(model, dataloader, dev):
         inps, outs = outs, inps
 
     model.config.use_cache = use_cache
-    print(f'Total quant time: {sum(times):.2f}s')
+    logger.info(f'Total quant time: {sum(times):.2f}s')
 
     return quantizers, errors
 
 
 @torch.no_grad()
 def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
-    print("Starting ...")
+    logger.info("Starting ...")
 
     for name, module in model.named_modules():
         module.global_name = args.model + name
@@ -1140,15 +1142,15 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
     attention_mask = cache["attention_mask"]
     position_ids = cache["position_ids"]
 
-    print("Ready.")
+    logger.info("Ready.")
     index = 0
     mixed_block_precision = {}
     quantizers = {}
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -1211,8 +1213,8 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
         mixed_block_precision[i] = {}
 
         for name in gptq:
-            print(i, name)
-            print("Quantizing ...")
+            logger.info(i, name)
+            logger.info("Quantizing ...")
             layer_block_precision, scales, zeros, g_idx = gptq[name].fasterquant(
                 percdamp=args.percdamp, 
                 blocksize=args.groupsize,
@@ -1233,7 +1235,7 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
         torch.cuda.empty_cache()
         inps, outs = outs, inps
         
-    # print("The average bit-width is:  ", sum(mean_bit_width) / len(mean_bit_width), " bits")
+    # logger.info("The average bit-width is:  ", sum(mean_bit_width) / len(mean_bit_width), " bits")
     model.config.use_cache = use_cache
     return quantizers
 
@@ -1243,12 +1245,12 @@ def llama_pack3(model, quantizers):
     layers = {n: layers[n] for n in quantizers}
     make_quant3(model, quantizers)
     qlayers = find_layers(model, [Quant3Linear])
-    print('Packing ...')
+    logger.info('Packing ...')
     for name in qlayers:
-        print(name)
+        logger.info(name)
         quantizers[name] = quantizers[name].cpu()
         qlayers[name].pack(layers[name].cpu(), quantizers[name].scale, quantizers[name].zero)
-    print('Done.')
+    logger.info('Done.')
     return model
 
 
@@ -1256,13 +1258,13 @@ def llama_pack3(model, quantizers):
 def z_folding(model, quantizers):
     layers = model.model.layers
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
     for i in range(len(layers)):
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         subset = find_layers(layer)
         for name in subset:
-            print(i, name)
+            logger.info(i, name)
             # LayerNorm Folding
             if name in ["self_attn.k_proj", "self_attn.q_proj", "self_attn.v_proj"]:
                 subset[name].weight.data.div_(quantizers[f"model.layers.{i}.{name}"].zeta)
@@ -1307,6 +1309,7 @@ if __name__ == '__main__':
         '--seed',
         type=int, default=0, help='Seed for sampling the calibration data.'
     )
+    parser.add_argument("--log_dir", default="./log/", type=str, help="direction of logging file")
     parser.add_argument(
         '--nsamples', type=int, default=128,
         help='Number of calibration data samples.'
@@ -1387,8 +1390,14 @@ if __name__ == '__main__':
     parser.add_argument("--quantizer_metric", type=str, default="mse", help="quantizer parameter determination metric")
     parser.add_argument("--lambda_salience", type=float, default=1, help="Percent of the average Hessian diagonal to use for dampening.")
 
-
     args = parser.parse_args()
+
+    # init logger
+    if args.log_dir:
+        Path(args.log_dir).mkdir(parents=True, exist_ok=True)
+    log_dir = Path(args.log_dir)
+    logger = create_logger(log_dir)
+    logger.info(args)
     
     model = get_llama(args.model)
     model.eval()
@@ -1396,7 +1405,7 @@ if __name__ == '__main__':
     dataloader, testloader = get_loaders(
         args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
     )
-    print(f"Dataset {args.dataset} Loaded!")
+    logger.info(f"Dataset {args.dataset} Loaded!")
 
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
         from gptq.gptq import *
@@ -1406,13 +1415,13 @@ if __name__ == '__main__':
 
         tick = time.time()
         quantizers = llama_sequential_gptq(model, dataloader, DEV)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_gptq_zfold(args, model, testloader, DEV)
 
         if args.save:
@@ -1429,13 +1438,13 @@ if __name__ == '__main__':
 
         tick = time.time()
         quantizers = llama_sequential_billm(model, dataloader, DEV)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_billm(args, model, testloader, DEV)
 
         if args.save:
@@ -1452,7 +1461,7 @@ if __name__ == '__main__':
 
         tick = time.time()
         quantizers = llama_sequential_zfold(model, dataloader, DEV, args.wbits, args.salient_metric, args.use_zfold)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
         if args.use_zfold:
             z_folding(model, quantizers)
 
@@ -1460,7 +1469,7 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_gptq_zfold(args, model, testloader, DEV)
         
         if args.save:
@@ -1476,13 +1485,13 @@ if __name__ == '__main__':
 
         tick = time.time()
         quantizers = llama_sequential_claq(model, dataloader, DEV)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_gptq_claq(args, model, testloader, DEV)
 
         if args.save:
@@ -1498,13 +1507,13 @@ if __name__ == '__main__':
 
         tick = time.time()
         llama_sequential_pbllm(model, dataloader, DEV)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_pbllm(args, model, testloader, DEV)
 
         if args.save:
@@ -1515,13 +1524,13 @@ if __name__ == '__main__':
     elif args.method == 'decoupleQ':
         tick = time.time()
         quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_pbllm(args, model, testloader, DEV)
 
         if args.save:
@@ -1537,13 +1546,13 @@ if __name__ == '__main__':
 
         tick = time.time()
         llama_sequential_quip(model, dataloader, DEV)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_quip(args, model, testloader, DEV)
 
         if args.save:
@@ -1564,19 +1573,19 @@ if __name__ == '__main__':
         if os.path.exists(block_configurations):
             block_precision = torch.load(block_configurations)
         else:
-            print(f'Block precisions of {net} does not exist. Start aware!')
+            logger.info(f'Block precisions of {net} does not exist. Start aware!')
             block_precision = None
     
 
         tick = time.time()
         llama_sequential_slim(model, dataloader, DEV, block_precision)
-        print(time.time() - tick)
+        logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
-            print(dataset)
+            logger.info(dataset)
             llama_eval_slim(args, model, testloader, DEV)
         
         if args.tasks != "":
