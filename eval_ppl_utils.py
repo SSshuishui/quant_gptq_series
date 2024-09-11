@@ -421,7 +421,7 @@ def llama_eval_quip(args, model, testenc, dev):
 
 
 @torch.no_grad()
-def llama_eval_slim(model, testenc, dev,  dataset: str, log_wandb: bool = False):
+def llama_eval_slim(args, model, testenc, dev):
     print("Evaluating ...")
 
     testenc = testenc.input_ids
@@ -513,7 +513,7 @@ def llama_eval_slim(model, testenc, dev,  dataset: str, log_wandb: bool = False)
 
 
 @torch.no_grad()
-def zeroshot_evaluate(model, args, dev):
+def zeroshot_evaluate(args, model, dev):
     results = {}
     limit = -1
 
@@ -525,7 +525,7 @@ def zeroshot_evaluate(model, args, dev):
         model.transformer = model.transformer.to(model.device)
 
     if args.tasks != "":
-        from model_utils.LMClass import LMClass
+        from utils.LMClass import LMClass
         lm = LMClass(model, args)
 
         t_results = evaluator.simple_evaluate(

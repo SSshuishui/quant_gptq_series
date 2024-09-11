@@ -70,7 +70,7 @@ class SliM_Quantizer(nn.Module):
         if self.method==1:
             scale, zero = binary_scale(w)
             maxq = None
-        print("this block bit_width: ", self.method)
+        # print("this block bit_width: ", self.method)
         else:
             bits = self.method
             perchannel = True

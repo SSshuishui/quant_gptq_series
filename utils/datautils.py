@@ -1,5 +1,4 @@
 import random
-
 import numpy as np
 import torch
 from datasets import load_dataset
@@ -11,28 +10,12 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.random.manual_seed(seed)
 
-'''
-Generate tokenizer and return it to preload datasets by converting them to embedded vectors instead of natural words
-'''
-def get_tokenizer(model):
-    if "llama" in model.lower():
-        tokenizer = LlamaTokenizer.from_pretrained(model, use_fast=False)
-        # fix for transformer 4.28.0.dev0 compatibility
-        if tokenizer.bos_token_id != 1 or tokenizer.eos_token_id != 2:
-            try:
-                tokenizer.bos_token_id = 1
-                tokenizer.eos_token_id = 2
-            except AttributeError:
-                pass
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
-    return tokenizer
 
-def get_wikitext2(nsamples, seed, seqlen, model, tokenizer):
-    
+def get_wikitext2(nsamples, seed, seqlen, model):
     traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
     testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
+    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
     trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
     testenc = tokenizer("\n\n".join(testdata['text']), return_tensors='pt')
 
@@ -47,10 +30,12 @@ def get_wikitext2(nsamples, seed, seqlen, model, tokenizer):
         trainloader.append((inp, tar))
     return trainloader, testenc
 
-def get_ptb(nsamples, seed, seqlen, model, tokenizer):
+
+def get_ptb(nsamples, seed, seqlen, model):
     traindata = load_dataset('ptb_text_only', 'penn_treebank', split='train')
     testdata = load_dataset('ptb_text_only', 'penn_treebank', split='test')
 
+    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
     trainenc = tokenizer(" ".join(traindata['sentence']), return_tensors='pt')
     testenc = tokenizer(" ".join(testdata['sentence']), return_tensors='pt')
 
@@ -65,17 +50,16 @@ def get_ptb(nsamples, seed, seqlen, model, tokenizer):
         trainloader.append((inp, tar))
     return trainloader, testenc
 
-class TokenizerWrapper:
-    def __init__(self, input_ids):
-        self.input_ids = input_ids
 
-def get_c4(nsamples, seed, seqlen, model, tokenizer):
+def get_c4(nsamples, seed, seqlen, model):
     traindata = load_dataset(
         'bhxiang/c4_calibrate_mini', split='train'
     )
     valdata = load_dataset(
         'bhxiang/c4_calibrate_mini', split='validation'
     )
+    
+    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
 
     random.seed(seed)
     trainloader = []
@@ -95,17 +79,20 @@ def get_c4(nsamples, seed, seqlen, model, tokenizer):
     valenc = tokenizer(' '.join(valdata[:1100]['text']), return_tensors='pt')
     valenc = valenc.input_ids[:, :(256 * seqlen)]
 
-    
+    class TokenizerWrapper:
+        def __init__(self, input_ids):
+            self.input_ids = input_ids
+
     valenc = TokenizerWrapper(valenc)
 
     return trainloader, valenc
 
+
 def get_loaders(name, nsamples=128, seed=0, seqlen=2048, model=''):
 
-    tokenizer = get_tokenizer(model)
     if 'wikitext2' in name:
-        return get_wikitext2(nsamples, seed, seqlen, model, tokenizer)
+        return get_wikitext2(nsamples, seed, seqlen, model)
     if 'ptb' in name:
-        return get_ptb(nsamples, seed, seqlen, model, tokenizer)
+        return get_ptb(nsamples, seed, seqlen, model)
     if 'c4' in name:
-        return get_c4(nsamples, seed, seqlen, model, tokenizer)
+        return get_c4(nsamples, seed, seqlen, model)

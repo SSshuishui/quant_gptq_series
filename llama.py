@@ -1064,7 +1064,7 @@ def llama_sequential_quip(model, dataloader, dev):
 
 
 @torch.no_grad()
-def quant_sequential_slim(model, dataloader, dev):
+def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
     print("Starting ...")
 
     for name, module in model.named_modules():
@@ -1162,7 +1162,7 @@ def quant_sequential_slim(model, dataloader, dev):
             quantizer = SliM_Quantizer(
                 subset[name].weight,
                 method=args.wbits,
-                groupsize=groupsize,
+                groupsize=args.groupsize,
                 metric = args.quantizer_metric,
                 lambda_salience=args.lambda_salience        
             )
@@ -1173,7 +1173,7 @@ def quant_sequential_slim(model, dataloader, dev):
                 layer_index=index,
                 salient_block = args.salient_block,
                 nonsalient_block = args.nonsalient_block,
-                bit_width = int(args.wbits[0])
+                bit_width = args.wbits
             )
 
         def add_batch(name):
@@ -1202,7 +1202,7 @@ def quant_sequential_slim(model, dataloader, dev):
             handles = []
             for name in gptq:
                 handles.append(subset[name].register_forward_hook(get_block(name)))
-            for j in tqdm.tqdm(range(args.nsamples), desc="Determining block precision..."):
+            for j in range(args.nsamples):
                 outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
             for h in handles:
                 h.remove()
@@ -1223,7 +1223,6 @@ def quant_sequential_slim(model, dataloader, dev):
             quantizers['model.layers.%d.%s' % (i, name)] = (scales.cpu(), zeros.cpu(), g_idx.cpu(), args.wbits, args.groupsize)
 
             gptq[name].free()
-
 
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
@@ -1397,6 +1396,7 @@ if __name__ == '__main__':
     dataloader, testloader = get_loaders(
         args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
     )
+    print(f"Dataset {args.dataset} Loaded!")
 
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
         from gptq.gptq import *
@@ -1555,10 +1555,21 @@ if __name__ == '__main__':
     elif args.method == 'slim':
         from gptq.slim.slim import SliM_Quantizer
         from gptq.slim.slim_gptq import SliMGPTQ
-        from eval_ppl_utils import 
+        from eval_ppl_utils import llama_eval_slim
+
+        # get the block precision of the model
+        # if the block precision does not exist, start Salience-Determined Bit Allocation
+        net = args.model.split("/")[-1]
+        block_configurations = f'./SliM-LLM_group-precision/block_precision_{args.groupsize}_{args.wbits}bits/{net}.pt'
+        if os.path.exists(block_configurations):
+            block_precision = torch.load(block_configurations)
+        else:
+            print(f'Block precisions of {net} does not exist. Start aware!')
+            block_precision = None
+    
 
         tick = time.time()
-        llama_sequential_quip(model, dataloader, DEV)
+        llama_sequential_slim(model, dataloader, DEV, block_precision)
         print(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
@@ -1566,7 +1577,11 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV)
+            llama_eval_slim(args, model, testloader, DEV)
+        
+        if args.tasks != "":
+            from eval_ppl_utils import zeroshot_evaluate
+            zeroshot_evaluate(args, model, DEV)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
