@@ -1,11 +1,11 @@
 import time
-
 import torch
 import torch.nn as nn
+from lm_eval import evaluator
 
 @torch.no_grad()
-def llama_eval_gptq_zfold(args, model, testenc, dev):
-    print('Evaluating ...')
+def llama_eval_gptq_zfold(args, model, testenc, dev, logger):
+    logger.info('Evaluating ...')
 
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
@@ -51,10 +51,10 @@ def llama_eval_gptq_zfold(args, model, testenc, dev):
     position_ids = cache['position_ids']
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -101,14 +101,14 @@ def llama_eval_gptq_zfold(args, model, testenc, dev):
         neg_log_likelihood = loss.float() * model.seqlen
         nlls.append(neg_log_likelihood)
     ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * model.seqlen))
-    print(ppl.item())
+    logger.info(ppl.item())
 
     model.config.use_cache = use_cache
 
 
 @torch.no_grad()
-def llama_eval_billm(args, model, testenc, dev):
-    print('Evaluating ...')
+def llama_eval_billm(args, model, testenc, dev, logger):
+    logger.info('Evaluating ...')
 
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
@@ -154,10 +154,10 @@ def llama_eval_billm(args, model, testenc, dev):
     position_ids = cache['position_ids']
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -204,14 +204,14 @@ def llama_eval_billm(args, model, testenc, dev):
         neg_log_likelihood = loss.float() * model.seqlen
         nlls.append(neg_log_likelihood)
     ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * model.seqlen))
-    print(ppl.item())
+    logger.info(ppl.item())
 
     model.config.use_cache = use_cache
 
 
 @torch.no_grad()
-def llama_eval_pbllm(args, model, testenc, dev):
-    print('Evaluating ...')
+def llama_eval_pbllm(args, model, testenc, dev, logger):
+    logger.info('Evaluating ...')
 
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
@@ -258,10 +258,10 @@ def llama_eval_pbllm(args, model, testenc, dev):
     position_ids = cache['position_ids']
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -306,14 +306,14 @@ def llama_eval_pbllm(args, model, testenc, dev):
         neg_log_likelihood = loss.float() * model.seqlen
         nlls.append(neg_log_likelihood)
     ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * model.seqlen))
-    print(ppl.item())
+    logger.info(ppl.item())
 
     model.config.use_cache = use_cache
 
 
 @torch.no_grad()
-def llama_eval_quip(args, model, testenc, dev):
-    # print('Evaluating ...')
+def llama_eval_quip(args, model, testenc, dev, logger):
+    logger.info('Evaluating ...')
 
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
@@ -376,10 +376,10 @@ def llama_eval_quip(args, model, testenc, dev):
     position_ids = cache['position_ids']
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in tqdm(range(len(layers))):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -415,14 +415,14 @@ def llama_eval_quip(args, model, testenc, dev):
         neg_log_likelihood = loss.float() * model.seqlen
         nlls.append(neg_log_likelihood)
     ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * model.seqlen))
-    print(ppl.item())
+    logger.info(ppl.item())
 
     model.config.use_cache = use_cache
 
 
 @torch.no_grad()
-def llama_eval_slim(args, model, testenc, dev):
-    print("Evaluating ...")
+def llama_eval_slim(args, model, testenc, dev, logger):
+    logger.info("Evaluating ...")
 
     testenc = testenc.input_ids
     nsamples = testenc.numel() // model.seqlen
@@ -470,10 +470,10 @@ def llama_eval_slim(args, model, testenc, dev):
     position_ids = cache["position_ids"]
 
     hf_device_map = model.hf_device_map
-    print(hf_device_map)
+    logger.info(hf_device_map)
 
     for i in range(len(layers)):
-        print(f'================={i}==================')
+        logger.info(f'================={i}==================')
         hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -507,13 +507,13 @@ def llama_eval_slim(args, model, testenc, dev):
         neg_log_likelihood = loss.float() * model.seqlen
         nlls.append(neg_log_likelihood)
     ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * model.seqlen))
-    print(f"Perplexity: {ppl.item():3f}")
+    logger.info(f"Perplexity: {ppl.item():3f}")
 
     model.config.use_cache = use_cache
 
 
 @torch.no_grad()
-def zeroshot_evaluate(args, model, dev):
+def zeroshot_evaluate(args, model, dev, logger):
     results = {}
     limit = -1
 
@@ -535,7 +535,7 @@ def zeroshot_evaluate(args, model, dev):
             limit=None if limit == -1 else limit,
         )
         results.update(t_results)
-        pprint(results)
+        plogger.info(results)
         # for test of MMLU
         if 'hendrycksTest' in args.tasks:
             all_cors = []
@@ -561,7 +561,7 @@ def zeroshot_evaluate(args, model, dev):
                     
             for cat in cat_cors:
                 cat_acc = np.mean(cat_cors[cat])
-                print("Average accuracy {:.4f} - {}".format(cat_acc, cat))
+                logger.info("Average accuracy {:.4f} - {}".format(cat_acc, cat))
             weighted_acc = np.mean(all_cors)
-            print("Average accuracy: {:.4f}".format(weighted_acc))               
-    print(results)
+            logger.info("Average accuracy: {:.4f}".format(weighted_acc))               
+    logger.info(results)

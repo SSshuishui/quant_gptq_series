@@ -14,6 +14,7 @@ def pattern_match(patterns, source_list):
         for matching in fnmatch.filter(source_list, pattern+"*"):
             task_names.add(matching)
     return list(task_names)
+    
 @positional_deprecated
 def simple_evaluate(
     lm,

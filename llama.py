@@ -145,7 +145,7 @@ def llama_sequential_gptq(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                logger.info(i, name)
+                print(i, name)
                 logger.info('Quantizing ...')
                 gptq[name].fasterquant(
                     percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, static_groups=args.static_groups
@@ -257,7 +257,7 @@ def llama_sequential_billm(model, dataloader, dev):
             h.remove()
 
         for name in gptq:
-            logger.info(i, name)
+            print(i, name)
             logger.info("Quantizing ...")
             info = gptq[name].fasterquant(
                 percdamp=args.percdamp, 
@@ -577,7 +577,7 @@ def llama_sequential_claq(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                logger.info(i, name)
+                print(i, name)
                 logger.info('Quantizing ...')
                 layername = '.'+str(i)+'.'+name
                 claq[name].fasterquant(args.wbits, layername, args.outlier, args.outlier_col_dynamic, args.outlier_layer_dynamic, args.outlierorder, args.inputhes, save_quant=args.save, blocksize=args.blocksize, percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
@@ -731,7 +731,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
             h.remove()
 
         for name in gpts:
-            logger.info(i, name)
+            print(i, name)
             logger.info("Quantizing ...")
             info = gpts[name].fasterquant(
                 args.low_frac, percdamp=args.percdamp, blocksize=args.blocksize
@@ -863,7 +863,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
 
             for name in names:
                 del subset[name].mask
-                logger.info(i, name)
+                print(i, name)
                 logger.info('Quantizing ...')
                 t1 = time.time()
                 torch.cuda.empty_cache()
@@ -1032,7 +1032,7 @@ def llama_sequential_quip(model, dataloader, dev):
 
         # Quantize Weights
         for name in subset:
-            logger.info(i, name)
+            print(i, name)
             logger.info('Quantizing ...')
             quant_method[name].preproc(
                                 preproc_gptqH=args.pre_gptqH, percdamp=args.percdamp,
@@ -1213,7 +1213,7 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
         mixed_block_precision[i] = {}
 
         for name in gptq:
-            logger.info(i, name)
+            print(i, name)
             logger.info("Quantizing ...")
             layer_block_precision, scales, zeros, g_idx = gptq[name].fasterquant(
                 percdamp=args.percdamp, 
@@ -1264,7 +1264,7 @@ def z_folding(model, quantizers):
         layer = layers[i].to(hf_device)
         subset = find_layers(layer)
         for name in subset:
-            logger.info(i, name)
+            print(i, name)
             # LayerNorm Folding
             if name in ["self_attn.k_proj", "self_attn.q_proj", "self_attn.v_proj"]:
                 subset[name].weight.data.div_(quantizers[f"model.layers.{i}.{name}"].zeta)
@@ -1359,7 +1359,6 @@ if __name__ == '__main__':
     )
     parser.add_argument("--tasks",  type=str, default="", help="Task datasets Evaluate")
 
-
     # For Zfold args
     parser.add_argument("--use_zfold", action='store_true', help="outlier colomn dynamic.")
 
@@ -1393,6 +1392,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # init logger
+    args.log_dir = f"{args.log_dir}/{args.method}-{args.model.split('/')[-1]}-w{args.wbits}"
     if args.log_dir:
         Path(args.log_dir).mkdir(parents=True, exist_ok=True)
     log_dir = Path(args.log_dir)

@@ -10,7 +10,7 @@ Include:
 | CLAQ | ✅ | ✅ | TODO | TODO 
 | Z-Fold | ✅ | ✅ | TODO | TODO 
 | decoupleQ | TODO | TODO | TODO | TODO 
-| Slim | TODO | TODO | TODO | TODO 
+| Slim | ✅ | TODO | TODO | TODO 
 | Slim Plus | TODO | TODO | TODO | TODO 
 | QuIP | ✅ | ✅ | TODO | TODO 
 
