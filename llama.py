@@ -1309,7 +1309,9 @@ if __name__ == '__main__':
         '--seed',
         type=int, default=0, help='Seed for sampling the calibration data.'
     )
-    parser.add_argument("--log_dir", default="./log/", type=str, help="direction of logging file")
+    parser.add_argument("--log_dir",
+        default="./log/", type=str, help="direction of logging file."
+    )
     parser.add_argument(
         '--nsamples', type=int, default=128,
         help='Number of calibration data samples.'
@@ -1410,7 +1412,7 @@ if __name__ == '__main__':
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
         from gptq.gptq import *
         from gptq.quant import *
-        from eval_ppl_utils import llama_eval_gptq_zfold
+        from eval_ppl_utils import llama_eval_gptq_claq
 
 
         tick = time.time()
@@ -1422,7 +1424,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_gptq_zfold(args, model, testloader, DEV)
+            llama_eval_gptq_claq(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1445,7 +1447,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_billm(args, model, testloader, DEV)
+            llama_eval_billm(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -1457,7 +1459,7 @@ if __name__ == '__main__':
         from gptq.gptq_zfold import GPTQ
         from gptq.quant import ZFoldQuantizer
         from gptq.zfold import *
-        from eval_ppl_utils import llama_eval_gptq_zfold
+        from eval_ppl_utils import llama_eval_zfold
 
         tick = time.time()
         quantizers = llama_sequential_zfold(model, dataloader, DEV, args.wbits, args.salient_metric, args.use_zfold)
@@ -1470,7 +1472,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_gptq_zfold(args, model, testloader, DEV)
+            llama_eval_zfold(args, model, testloader, DEV, logger)
         
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -1492,7 +1494,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_gptq_claq(args, model, testloader, DEV)
+            llama_eval_gptq_claq(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1514,7 +1516,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV)
+            llama_eval_pbllm(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_lowfeac{args.low_frac}_highbit{args.high_bit}_seed{args.seed}"
@@ -1531,7 +1533,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV)
+            llama_eval_pbllm(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1553,7 +1555,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_quip(args, model, testloader, DEV)
+            llama_eval_quip(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -1586,7 +1588,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_slim(args, model, testloader, DEV)
+            llama_eval_slim(args, model, testloader, DEV, logger)
         
         if args.tasks != "":
             from eval_ppl_utils import zeroshot_evaluate
