@@ -1,0 +1,7 @@
+**/__pycache__
+qmodel/
+outputs/
+*.pyc
+/log
+*.log
+*.txt
