@@ -1599,7 +1599,4 @@ if __name__ == '__main__':
             save_file = "./qmodel/" + save_title + ".pt"
             llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
-
-    elif arg.method == 'slim+':
-        pass
     

@@ -8,11 +8,10 @@ Include:
 | PB-LLM | ✅ | ✅ | TODO | TODO 
 | BiLLM | ✅ | ✅ | TODO | TODO 
 | CLAQ | ✅ | ✅ | TODO | TODO 
-| Z-Fold | ✅ | ✅ | TODO | TODO 
-| decoupleQ | TODO | TODO | TODO | TODO 
-| Slim | ✅ | TODO | TODO | TODO 
-| Slim Plus | TODO | TODO | TODO | TODO 
+| Z-Fold（llama1,2） | ✅ | ✅ | TODO | TODO 
+| Slim | ✅ | ✅ | TODO | TODO 
 | QuIP | ✅ | ✅ | TODO | TODO 
+| DecoupleQ | TODO | TODO | TODO | TODO 
 
 #### GPTQ for LLaMA families
 ```
@@ -83,6 +82,7 @@ python llama.py --method quip --model ${MODEL_DIR} --dataset c4
 # Run a quantization method with baseline processing
 python llama.py --method quip --model ${MODEL_DIR} --dataset c4 --wbits 4 --quant gptq --pre_gptqH --save 
 ```
+
 
 #### SliM
 ```
