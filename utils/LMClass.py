@@ -1,11 +1,10 @@
 import transformers
 import torch
-from .models_utils import BaseLM, find_layers
+from .modelutils import BaseLM, find_layers, DEV
 from transformers import AutoTokenizer
 import torch.nn.functional as F
 from torch import nn
 import torch
-
 
 
 class LMClass(BaseLM):
@@ -13,9 +12,8 @@ class LMClass(BaseLM):
 
         super().__init__()
 
-        self._device = args.device
+        self._device = DEV
         self.tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False,legacy=False)
-        # self.model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu',torch_dtype=config.torch_dtype)
         self.batch_size_per_gpu = 1
         self.model = model
         self.seqlen = self.model.config.max_position_embeddings
@@ -77,7 +75,9 @@ class LMClass(BaseLM):
         logits returned from the model
         """
         with torch.no_grad():
-            return self.model(inps)["logits"]
+            print("inps shape: ", inps, inps.shape)
+            print("model.hf_device_map: ", self.model.hf_device_map)
+            return self.model(inps.to(self._device))["logits"]
 
     def model_batched_set(self, inps):
         dataset_logits = []

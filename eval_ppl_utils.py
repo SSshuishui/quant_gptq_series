@@ -1,7 +1,7 @@
 import time
 import torch
 import torch.nn as nn
-from lm_eval import evaluator
+from lm_eval import evaluator,task
 
 @torch.no_grad()
 def llama_eval_gptq_claq(args, model, testenc, dev, logger):

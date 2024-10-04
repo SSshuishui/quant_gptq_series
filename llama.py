@@ -1236,6 +1236,12 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
         inps, outs = outs, inps
         
     # logger.info("The average bit-width is:  ", sum(mean_bit_width) / len(mean_bit_width), " bits")
+    if saved_block_precision is None:
+        net = args.model.split("/")[-1]
+        save_path = os.path.join(f'./SliM-LLM_group-precision/block_precision_{args.groupsize}_{args.low_quant_method}/', f'{net}.pt')
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        torch.save(mixed_block_precision, save_path)
+
     model.config.use_cache = use_cache
     return quantizers
 
@@ -1426,6 +1432,10 @@ if __name__ == '__main__':
             logger.info(dataset)
             llama_eval_gptq_claq(args, model, testloader, DEV, logger)
 
+        if args.tasks != "":
+            from eval_ppl_utils import zeroshot_evaluate
+            zeroshot_evaluate(args, model, DEV, logger)
+
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
@@ -1452,7 +1462,6 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'zfold' and args.wbits < 16 and not args.nearest:
@@ -1477,7 +1486,6 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
@@ -1499,7 +1507,6 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
     
     elif args.method == 'pbllm':
@@ -1538,7 +1545,6 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
     
     elif args.method == 'quip':
@@ -1560,7 +1566,6 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'slim':
@@ -1578,7 +1583,6 @@ if __name__ == '__main__':
             logger.info(f'Block precisions of {net} does not exist. Start aware!')
             block_precision = None
     
-
         tick = time.time()
         llama_sequential_slim(model, dataloader, DEV, block_precision)
         logger.info(time.time() - tick)
@@ -1597,6 +1601,5 @@ if __name__ == '__main__':
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
-            llama_pack3(model, quantizers)
             torch.save(model.state_dict(), save_file)
     
