@@ -496,7 +496,7 @@ def llama_eval_quip(args, model, testenc, dev, logger):
 
 
 @torch.no_grad()
-def llama_eval_slim(args, model, testenc, dev, logger):
+def llama_eval_slim_awrq(args, model, testenc, dev, logger):
     logger.info("Evaluating ...")
 
     testenc = testenc.input_ids

@@ -92,3 +92,12 @@ python llama.py --method slim --model ${MODEL_DIR} --dataset wikitext2 --wbits 4
 # W3A16G128
 python llama.py --method slim --model ${MODEL_DIR} --dataset wikitext2 --wbits 3 --groupsize 128 --tasks piqa,arc_easy,arc_challenge,boolq,hellaswag,winogrande
 ```
+
+#### AWRQ
+```
+# with smoothing
+python llama.py --method awrq --model ${MODEL_DIR} --dataset c4 --table_results --wbits 4 --act_bits 8 --blocksize 1 --smooth --alpha 0.50 --min 0.01 --tasks piqa,arc_easy,arc_challenge,boolq,copa,storycloze 
+
+# without smoothing
+python llama.py --method awrq --model ${MODEL_DIR} --dataset c4  --table_results --wbits 4 --act_bits 8 --blocksize 1 --tasks piqa,arc_easy,arc_challenge,boolq,copa,storycloze
+```

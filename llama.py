@@ -1246,6 +1246,115 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
     return quantizers
 
 
+def llama_sequential_awrq(model, dataloader, dev):
+    logger.info("Starting ...")
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.layers
+
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {'i': 0, 'attention_mask': None}
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+
+        def forward(self, inp, **kwargs):
+            inps[cache["i"]] = inp
+            cache["i"] += 1
+            cache["attention_mask"] = kwargs["attention_mask"]
+            cache["position_ids"] = kwargs["position_ids"]
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache['attention_mask']
+    position_ids = cache['position_ids']
+
+    logger.info('Ready.')
+    hf_device_map = model.hf_device_map
+    logger.info(hf_device_map)
+
+    quantizers = {}
+    for i in range(len(layers)):
+        logger.info(f'================={i}==================')
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
+
+        layer = replace_linear_layer(args.model, layer, smooth=args.smooth, alpha=args.alpha, min=args.min, act_quant=False, act_bits=args.act_bits)
+
+        subset = find_layers(layer)
+        awrq = {}
+        for name in subset:
+            awrq[name] = AWRQ(subset[name], args.method)
+            awrq[name].quantizer = AWRQQuantizer()  # quantizer in quant.py
+            awrq[name].quantizer.configure(args.wbits, perchannel=True, sym=args.sym, mse=False, trits=True)
+
+        def add_batch(name):
+            def tmp(_, inp, out):
+                gptq[name].add_batch(inp[0].data, out.data)
+            return tmp
+
+        # smooth
+        if args.smooth:
+            smoothing_layer(layer, subset, awrq, inps, attention_mask, outs)
+            
+        handles = []
+        for name in gptq:
+            handles.append(subset[name].register_forward_hook(add_batch(name)))
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+        for h in handles:
+            h.remove()
+        
+        # quantize weights
+        for name in subset:
+            print(i, name)
+            logger.info('Quantizing ...')
+            awrq[name].quant_weight(
+                percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, static_groups=args.static_groups
+            )
+            quantizers['model.layers.%d.%s' % (i, name)] = awrq[name].quantizer
+            subset[name].act_quant = True
+            aweq[name].free()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del awrq 
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+    return quantizers
+
+
 def llama_pack3(model, quantizers):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
@@ -1354,7 +1463,7 @@ if __name__ == '__main__':
         help='Save quantized checkpoint under this name.'
     )
     parser.add_argument(
-        '--act-order', action='store_true',
+        '--act_order', action='store_true',
         help='Whether to apply the activation order GPTQ heuristic'
     )
     parser.add_argument(
@@ -1397,6 +1506,14 @@ if __name__ == '__main__':
     parser.add_argument("--quantizer_metric", type=str, default="mse", help="quantizer parameter determination metric")
     parser.add_argument("--lambda_salience", type=float, default=1, help="Percent of the average Hessian diagonal to use for dampening.")
 
+    # For AWRQ args
+    parser.add_argument("--act_bits", type=int, default=8)
+    parser.add_argument('--act_sym', default=False, action='store_true', help='bits used for inps quantization')
+    parser.add_argument("--smooth", default=False, action='store_true', help='smooth')
+    parser.add_argument("--alpha", type=float, default=0.50) # smooth param
+    parser.add_argument("--min", type=float, default=0.1) # smooth param
+
+
     args = parser.parse_args()
 
     # init logger
@@ -1419,7 +1536,6 @@ if __name__ == '__main__':
         from gptq.gptq import *
         from gptq.quant import *
         from eval_ppl_utils import llama_eval_gptq_claq
-
 
         tick = time.time()
         quantizers = llama_sequential_gptq(model, dataloader, DEV)
@@ -1571,7 +1687,7 @@ if __name__ == '__main__':
     elif args.method == 'slim':
         from gptq.slim.slim import SliM_Quantizer
         from gptq.slim.slim_gptq import SliMGPTQ
-        from eval_ppl_utils import llama_eval_slim
+        from eval_ppl_utils import llama_eval_slim_awrq
 
         # get the block precision of the model
         # if the block precision does not exist, start Salience-Determined Bit Allocation
@@ -1592,7 +1708,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_slim(args, model, testloader, DEV, logger)
+            llama_eval_slim_awrq(args, model, testloader, DEV, logger)
         
         if args.tasks != "":
             from eval_ppl_utils import zeroshot_evaluate
@@ -1602,4 +1718,26 @@ if __name__ == '__main__':
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
             torch.save(model.state_dict(), save_file)
+    
+    elif args.method == 'awrq':
+        from gptq.awrq import *
+        from eval_ppl_utils import llama_eval_slim_awrq
+        from gptq.quant import replace_linear_layer, AWRQQuantizer
+
+        tick = time.time()
+        quantizers = llama_sequential_awrq(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_slim_awrq(args, model, testloader, DEV, logger)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+
     
