@@ -65,7 +65,6 @@ def llama_sequential_gptq(model, dataloader, dev):
     )
     cache = {'i': 0, 'attention_mask': None}
 
-    
     class Catcher(nn.Module):
         def __init__(self, module):
             super().__init__()
@@ -1355,6 +1354,147 @@ def llama_sequential_awrq(model, dataloader, dev):
     return quantizers
 
 
+def llama_sequential_gptvq(model, dataloader, dev):
+    logger.info('Starting ...')
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.layers
+
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {'i': 0, 'attention_mask': None}
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            cache['i'] += 1
+            cache['attention_mask'] = kwargs['attention_mask']
+            cache['position_ids'] = kwargs['position_ids']
+
+            raise ValueError
+
+    layers[0] = Catcher(layers[0])
+
+    or batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache['attention_mask']
+    position_ids = cache['position_ids']
+
+    if args.use_vq:
+        QClass = lambda: VQQuantizer(
+            vq_dim=args.vq_dim,
+            columns_per_group=args.columns_per_group,
+            vq_scaling_blocksize=args.vq_scaling_blocksize,
+            vq_scaling_norm=args.vq_scaling_norm,
+            vq_scaling_n_bits=args.vq_scaling_n_bits,
+            vq_scaling_domain=args.vq_scaling_domain,
+            kmeans_init_method=args.kmeans_init_method,
+            assignment_chunk_size=args.assignment_chunk_size,
+            kmeans_iters=args.kmeans_iters,
+            codebook_bitwidth=args.codebook_bitwidth,
+            quantize_per_codebook=args.quantize_per_codebook,
+            quantize_during_kmeans=args.quantize_during_kmeans,
+            n_subsample=args.kpp_n_subsample,
+        )
+
+    logger.info('Ready.')
+
+    quantizers = {}
+    hf_device_map = model.hf_device_map
+    logger.info(hf_device_map)
+        
+    for i in range(len(layers)):
+        logger.info(f'================={i}==================')
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
+
+        full = find_layers(layer)
+
+        if args.true_sequential:
+            sequential = [
+                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
+                ['self_attn.o_proj'],
+                ['mlp.up_proj', 'mlp.gate_proj'],
+                ['mlp.down_proj'],
+            ]
+        else:
+            sequential = [list(full.keys())]
+
+        for names in sequential:
+            subset = {n: full[n] for n in names}
+            gptq = {}
+            for name in subset:
+                gptq[name] = GPTVQ(subset[name])
+                gptq[name].quantizer = QClass()
+                gptq[name].quantizer.configure(
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
+                )
+
+            def add_batch(name):
+                def tmp(_, inp, out):
+                    gptq[name].add_batch(inp[0].data, out.data)
+                return tmp
+
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+            for h in handles:
+                h.remove()
+
+            for name in subset:
+                print(i, name)
+                logger.info('Quantizing ...')
+                gptq[name].fasterquant(
+                    percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, static_groups=args.static_groups,
+                    include_m_step=args.include_m_step,
+                    use_vq=args.use_vq,
+                    svd_rank=args.svd_rank,
+                    hessian_weighted_lookups=args.hessian_weighted_lookups,
+                    only_init_kmeans=args.only_init_kmeans,
+                )
+                quantizers['model.layers.%d.%s' % (i, name)] = gptq[name].quantizer
+                gptq[name].free()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gptq 
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+    
+    return quantizers
+    
+
 def llama_pack3(model, quantizers):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
@@ -1512,6 +1652,28 @@ if __name__ == '__main__':
     parser.add_argument("--smooth", default=False, action='store_true', help='smooth')
     parser.add_argument("--alpha", type=float, default=0.50) # smooth param
     parser.add_argument("--min", type=float, default=0.1) # smooth param
+
+    # For gptvq args
+    parser.add_argument("--use-vq", action="store_true", help="If set, use VQ (multi-dim non-uniform) quantization")
+    parser.add_argument("--vq-dim", type=int, default=2, help="Dimensionality of VQ (if using)")
+    parser.add_argument("--vq-scaling-blocksize", type=int, default=-1, help="VQ scaling block size")
+    parser.add_argument("--vq-scaling-n-bits", type=int, default=4, help="VQ scaling bit-width")
+    parser.add_argument("--vq-scaling-norm", type=str, default="max", help="VQ scaling norm")
+    parser.add_argument("--vq-scaling-domain", type=str, default="log", choices=["log", "linear"], help="VQ scaling domain")
+    parser.add_argument("--include-m-step", action="store_true", help="If set, perform an M-step (centroid updating) after GPTQ with VQ")
+    parser.add_argument("--columns-per-group", type=int, default=None, help="For group-/blockwise quant: force number of columns each group spans (rest is absorbed in rows)")
+    parser.add_argument("--kmeans-init-method", type=str, default="cdf", choices=["cdf", "kpp", "mahalanobis"], help="init method for Kmeans")
+    parser.add_argument("--assignment-chunk-size", type=int, default=None, help="Chunk assignment step for better memory management")
+    parser.add_argument("--kmeans-iters", type=int, default=10)
+    parser.add_argument("--codebook-bitwidth", type=int, default=None, help="Bitwidth for codebook quantization")
+    parser.add_argument("--quantize-per-codebook", action="store_true", default=False, help="Quantize codebooks individually (more overhead) or per column block")
+    parser.add_argument("--quantize-during-kmeans", action="store_true", default=False, help="Quantize codebooks after every M-step. If not set: only quantize after k-means")
+    parser.add_argument("--model-type", choices=["llama", "mistral", "mixtral"], default="llama", help="In case this is a Mistral model (GPTQ layerwise remains the same)",)
+    parser.add_argument("--kpp-n-subsample", type=int, default=10000)
+    parser.add_argument("--svd-rank", type=float, default=None)
+    parser.add_argument("--output-dir", type=str, default=None, help="Directory to save model in")
+    parser.add_argument("--hessian-weighted-lookups", action="store_true", default=False)
+    parser.add_argument("--only-init-kmeans", action="store_true", default=False)
 
 
     args = parser.parse_args()
@@ -1740,4 +1902,29 @@ if __name__ == '__main__':
             save_file = "./qmodel/" + save_title + ".pt"
             torch.save(model.state_dict(), save_file)
 
-    
+    elif args.method == 'gptvq' and args.wbits < 16:
+        from gptq.gptvq.gptvq import *
+        from gptq.gptvq.vq_quant import VQQuantizer
+        from eval_ppl_utils import llama_eval_gptvq
+
+        tick = time.time()  
+        llama_sequential_gptvq(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_gptvq(args, model, testloader, DEV, logger)
+
+        if args.save:
+            from transformers import AutoTokenizer
+            from transformers.training_args import TrainingArguments
+            save_file = "./qmodel/gptvq/"
+
+            os.makedirs(save_file, exist_ok=True)
+            tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
+            new_args = TrainingArguments(no_cuda=True, output_dir=save_file)
+            trainer = transformers.Trainer(model=model, tokenizer=tokenizer, args=new_args)
+            trainer.save_model(save_file)
