@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 
-from .quant import *
+from .awrq_quant import *
 
 DEBUG = False
 torch.backends.cuda.matmul.allow_tf32 = False

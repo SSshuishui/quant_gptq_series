@@ -20,6 +20,7 @@ def get_llama(model):
     elif "llama" in model:
         from transformers import LlamaForCausalLM
         model = LlamaForCausalLM.from_pretrained(model, device_map='auto', torch_dtype='auto')
+        # model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
         model.seqlen = 2048
     return model
 
@@ -63,7 +64,7 @@ def llama_sequential_gptq(model, dataloader, dev):
     inps = torch.zeros(
         (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {'i': 0, 'attention_mask': None}
+    cache = {'i': 0, 'attention_mask': None, 'position_ids': None}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -74,7 +75,6 @@ def llama_sequential_gptq(model, dataloader, dev):
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
             cache['position_ids'] = kwargs['position_ids']
-
             raise ValueError
 
     layers[0] = Catcher(layers[0])
@@ -186,7 +186,7 @@ def llama_sequential_billm(model, dataloader, dev):
     inps = torch.zeros(
         (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {"i": 0, "attention_mask": None}
+    cache = {"i": 0, "attention_mask": None, 'position_ids': None}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -293,7 +293,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
     dtype = torch.float32
 
     inps = torch.zeros((args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev)
-    cache = {"i": 0, "attention_mask": None}
+    cache = {"i": 0, "attention_mask": None, 'position_ids': None}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -634,7 +634,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
     inps = torch.zeros(
         (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {"i": 0, "attention_mask": None}
+    cache = {"i": 0, "attention_mask": None, 'position_ids': None}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -765,30 +765,26 @@ def llama_sequential_pbllm(model, dataloader, dev):
 @torch.no_grad()
 def llama_sequential_decoupleq(model, dataloader, dev):
     logger.info("Starting ...")
-    layers = model.model.layers
-    
-    cache = []
-
-    class Catcher(nn.Module):
-        def __init__(self, module):
-            super().__init__()
-            self.module = module
-
-        def forward(self, *args, **kwargs):
-            inputs = [list(args), kwargs]
-            cache.append(to_device(inputs, "cpu"))
-            raise ValueError
-
-    layers[0] = Catcher(layers[0])
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
     layers = model.model.layers
+    
+    cache = []
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, *args, **kwargs):
+            inputs = [list(args), kwargs]
+            cache.append(to_device(inputs, "cpu"))
+            raise ValueError
+        
+    layers[0] = Catcher(layers[0])
 
     model.model.embed_tokens = model.model.embed_tokens.to(dev)
     model.model.norm = model.model.norm.to(dev)
-
-    # model = model.to(dev)
+    
     model.eval()
     torch.cuda.empty_cache()
     model.requires_grad_(False)
@@ -802,7 +798,6 @@ def llama_sequential_decoupleq(model, dataloader, dev):
             pass
 
     del dataloader, batch
-    gc.collect()
     layers[0] = layers[0].module
     model = model.cpu()
     inps = cache
@@ -814,6 +809,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
     outs = []
 
     for i in range(len(layers)):
+        logger.info(f"================={i}==================")
         t_layer0 = time.time()
         layer = layers[i]
         full = find_layers(layer)
@@ -1096,7 +1092,7 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
 
     dtype = next(iter(model.parameters())).dtype
     inps = torch.zeros((args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev)
-    cache = {"i": 0, "attention_mask": None}
+    cache = {"i": 0, "attention_mask": None, 'position_ids': None}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -1314,15 +1310,15 @@ def llama_sequential_awrq(model, dataloader, dev):
 
         def add_batch(name):
             def tmp(_, inp, out):
-                gptq[name].add_batch(inp[0].data, out.data)
+                awrq[name].add_batch(inp[0].data, out.data)
             return tmp
-
+        
         # smooth
         if args.smooth:
-            smoothing_layer(layer, subset, awrq, inps, attention_mask, outs)
+            smoothing_layer(layer, subset, awrq, inps, attention_mask, position_ids, outs)
             
         handles = []
-        for name in gptq:
+        for name in subset:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
@@ -1334,11 +1330,11 @@ def llama_sequential_awrq(model, dataloader, dev):
             print(i, name)
             logger.info('Quantizing ...')
             awrq[name].quant_weight(
-                percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, static_groups=args.static_groups
+                percdamp=args.percdamp, blocksize=args.blocksize, groupsize=args.groupsize, actorder=args.act_order
             )
             quantizers['model.layers.%d.%s' % (i, name)] = awrq[name].quantizer
             subset[name].act_quant = True
-            aweq[name].free()
+            awrq[name].free()
 
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
@@ -1385,7 +1381,7 @@ def llama_sequential_gptvq(model, dataloader, dev):
 
     layers[0] = Catcher(layers[0])
 
-    or batch in dataloader:
+    for batch in dataloader:
         try:
             model(batch[0].to(dev))
         except ValueError:
@@ -1493,7 +1489,161 @@ def llama_sequential_gptvq(model, dataloader, dev):
     model.config.use_cache = use_cache
     
     return quantizers
+
+
+def llama_sequential_owq(model, meta, dataloader, dev):
+    logger.info('Starting ...')
+
+    use_cache = model.config.use_cache
+    layers, pre_layers, _ = parsing_layers(model, meta)
+    model.config.use_cache = False
     
+    for pre_layer in pre_layers:
+        pre_layer = pre_layer.to(dev)
+    
+    layers[0] = layers[0].to(dev)
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {kw:None for kw in meta['inp_kwargs']}
+    cache['i'] = 0
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            for key in cache:
+                if key == 'i':
+                    cache['i'] += 1
+                else:
+                    cache[key] = kwargs[key]
+            raise ValueError
+    
+    layers[0] = Catcher(layers[0])
+
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    for pre_layer in pre_layers:
+        pre_layer = pre_layer.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    del cache['i']
+    inp_kwargs = cache
+
+    print('Ready.')
+
+    owq_layers = meta['owq_layers']
+    ratios = meta['ratios']
+    n_out_dict = {l:0 for l in owq_layers.keys()}
+    if args.target_bit is not None:
+        n_owq_layers = sum(owq_layers.values())
+        
+        r = (12 / (16 - args.wbits)) * (args.target_bit - args.wbits)
+        r /= n_owq_layers
+
+        layer = find_layers(layers[0])
+        
+        for l in owq_layers:
+            # for even number of n_out
+            n_out = round(layer[l].weight.data.shape[1] * r * ratios[l])
+            if n_out % 2 == 1: n_out += 1
+            n_out_dict[l] = n_out
+    elif args.target_rank is not None:
+        for l in owq_layers:
+            n_out_dict[l] = args.target_rank
+
+    quantizers = {}
+    hf_device_map = model.hf_device_map
+    logger.info(hf_device_map)
+        
+    for i in range(len(layers)):
+        logger.info(f'================={i}==================')
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        
+        full = find_layers(layer)
+
+        if args.true_sequential:
+            sequential = meta['sequential']
+        else:
+            sequential = [list(full.keys())]
+        
+        for names in sequential:
+            subset = {n: full[n] for n in names}
+
+            gptq_owq = {}
+            for name in subset:
+                gptq_owq[name] = OWQ_GPTQ(subset[name], n_out=n_out_dict[name])
+                gptq_owq[name].quantizer = Quantizer(
+                    args.wbits, perchannel=True, sym=args.sym, mse=(args.tuning == 'mse')
+                )
+                gptq_owq[name].quantizer.n_out = n_out_dict[name]
+                
+            def add_batch(name):
+                def tmp(_, inp, out):
+                    gptq_owq[name].add_batch(inp[0].data, out.data)
+                return tmp
+            
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                layer(inps[j].unsqueeze(0), **inp_kwargs)
+            for h in handles:
+                h.remove()
+            
+            for name in subset:
+                if not args.no_frob_norm:
+                    W = subset[name].weight.data.clone().to(torch.float)
+                    temp_quantizer = Quantizer(
+                        args.wbits, perchannel=True, sym=args.sym, mse=(args.tuning == 'mse')
+                    )
+                    temp_quantizer.find_params(W, weight=True, num=40)
+                    W_quant = temp_quantizer.quantize(W)
+                    frob_norm_error = (W - W_quant).pow(2).sum(dim=0)
+                else:
+                    frob_norm_error = None
+                out_ids = gptq_owq[name].hessian_sorting(actorder=args.act_order, frob_norm=frob_norm_error)
+                gptq_owq[name].quantizer.out_ids = out_ids
+                    
+            if not args.no_frob_norm:
+                del W
+                del W_quant
+                del temp_quantizer
+                torch.cuda.empty_cache()
+            
+            for name in subset:
+                print(f"Quantizing {meta['prefix']}.{i}.{name}")
+                gptq_owq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                quantizers[f"{meta['prefix']}.{i}.{name}"] = gptq_owq[name].quantizer
+                gptq_owq[name].free()
+            
+        for name in list(full.keys()):
+            quantizers[f"{meta['prefix']}.{i}.{name}"] = quantizers[f"{meta['prefix']}.{i}.{name}"].cpu()
+            
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), **inp_kwargs)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gptq_owq 
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+
+
 
 def llama_pack3(model, quantizers):
     layers = find_layers(model)
@@ -1532,6 +1682,52 @@ def z_folding(model, quantizers):
                 subset["mlp.up_proj"].weight.data.mul_(quantizers[f"model.layers.{i}.{name}"].zeta.T)
         # LayerNorm Folding
         layer.input_layernorm.weight.data.mul_(quantizers[f"model.layers.{i}.self_attn.q_proj"].zeta.squeeze())
+
+
+def smoothing_layer(layer, subset, awrq, inps, attention_mask, position_ids, outs):
+
+    def add_batch_act_scales(name):
+        def tmp(_, inp, out):
+            awrq[name].add_batch_act_scales(inp[0].data, out.data)
+        return tmp
+
+    # generate act scales
+    handles = []
+    for name in subset:
+        handles.append(subset[name].register_forward_hook(add_batch_act_scales(name)))
+    for j in range(args.nsamples):
+        outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0] # hook
+    # smooth scales
+    qkv_wight_scales = None
+
+    for name in subset:
+        subset[name].act_scales = awrq[name].act_scales.clone() # act scales
+        # weight scales
+        subset[name].weight_scales = subset[name].weight.abs().max(dim=0)[0]
+        # qkv weight scales
+        if 'q_proj' in name or 'k_proj' in name or 'v_proj' in name:
+            qkv_wight_scales = torch.max(qkv_wight_scales, subset[name].weight_scales) if qkv_wight_scales is not None else subset[name].weight_scales
+   
+    # absorb smooth_scales: linear
+    for name in subset:
+        print()
+        if 'q_proj' in name or 'k_proj' in name or 'v_proj' in name:
+            subset[name].weight_scales = qkv_wight_scales
+        subset[name].smooth_scales = (subset[name].act_scales.pow(subset[name].alpha) / subset[name].weight_scales.pow(1-subset[name].alpha)).clamp(min=subset[name].min)
+        subset[name].weight.data *= subset[name].smooth_scales # weight*scales
+        subset[name].act_scales = None 
+        subset[name].weight_scales = None
+        
+    # absorb smooth_scales: layer norm 
+    layer.input_layernorm.weight.data /= layer.self_attn.k_proj.smooth_scales            
+    layer.post_attention_layernorm.weight.data /= layer.mlp.gate_proj.smooth_scales
+    layer.self_attn.q_proj.act_smoothed = True
+    layer.self_attn.k_proj.act_smoothed = True
+    layer.self_attn.v_proj.act_smoothed = True
+    layer.mlp.gate_proj.act_smoothed = True
+
+    for h in handles:
+        h.remove()
 
 
 if __name__ == '__main__':
@@ -1675,6 +1871,13 @@ if __name__ == '__main__':
     parser.add_argument("--hessian-weighted-lookups", action="store_true", default=False)
     parser.add_argument("--only-init-kmeans", action="store_true", default=False)
 
+    # For OWQ
+    parser.add_argument('--target_bit', type=float, default=None, help='Effctive target bits for OWQ.')
+    parser.add_argument('--target_rank', type=int, default=None, help='Number of outlier channels for OWQ.(if --target_bit is not given)')
+    parser.add_argument('--tuning', type=str, default='mse', choices=['mse', 'minmax'], help='Method for quantization parameter tuning.')
+    parser.add_argument('--no_frob_norm', action='store_true', help='Whether to use Frobenius norm for OWQ.')
+    parser.add_argument('--dtype', type=str, default=None, help='Data type of model. Use bfloat16 for falcon model family or llama 65B model')
+    parser.add_argument('--layers', nargs='+', type=str, default=None, help='Layers to apply OWQ.')
 
     args = parser.parse_args()
 
@@ -1699,16 +1902,18 @@ if __name__ == '__main__':
         from gptq.quant import *
         from eval_ppl_utils import llama_eval_gptq_claq
 
-        tick = time.time()
-        quantizers = llama_sequential_gptq(model, dataloader, DEV)
-        logger.info(time.time() - tick)
+        model = model.to(DEV)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
-            dataloader, testloader = get_loaders(
-                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-            )
-            logger.info(dataset)
-            llama_eval_gptq_claq(args, model, testloader, DEV, logger)
+        # tick = time.time()
+        # quantizers = llama_sequential_gptq(model, dataloader, DEV)
+        # logger.info(time.time() - tick)
+
+        # for dataset in ['wikitext2', 'ptb', 'c4']:
+        #     dataloader, testloader = get_loaders(
+        #         dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+        #     )
+        #     logger.info(dataset)
+        #     llama_eval_gptq_claq(args, model, testloader, DEV, logger)
 
         if args.tasks != "":
             from eval_ppl_utils import zeroshot_evaluate
@@ -1808,23 +2013,6 @@ if __name__ == '__main__':
             save_file = "./qmodel/" + save_title + ".pt"
             torch.save(model.state_dict(), save_file)
     
-    elif args.method == 'decoupleQ':
-        tick = time.time()
-        quantizers = llama_sequential_decoupleq(args, model, layers, dataloader, dev=dev)
-        logger.info(time.time() - tick)
-
-        for dataset in ['wikitext2', 'ptb', 'c4']:
-            dataloader, testloader = get_loaders(
-                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-            )
-            logger.info(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV, logger)
-
-        if args.save:
-            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
-            save_file = "./qmodel/" + save_title + ".pt"
-            torch.save(model.state_dict(), save_file)
-    
     elif args.method == 'quip':
         from gptq.quip.gptq import QuIP_GPTQ
         from gptq.quip.quant import *
@@ -1884,7 +2072,7 @@ if __name__ == '__main__':
     elif args.method == 'awrq':
         from gptq.awrq import *
         from eval_ppl_utils import llama_eval_slim_awrq
-        from gptq.quant import replace_linear_layer, AWRQQuantizer
+        from gptq.awrq_quant import replace_linear_layer, AWRQQuantizer, find_layers
 
         tick = time.time()
         quantizers = llama_sequential_awrq(model, dataloader, DEV)
@@ -1928,3 +2116,47 @@ if __name__ == '__main__':
             new_args = TrainingArguments(no_cuda=True, output_dir=save_file)
             trainer = transformers.Trainer(model=model, tokenizer=tokenizer, args=new_args)
             trainer.save_model(save_file)
+
+    elif args.method == 'decoupleQ':
+        from gptq.decoupleQ.quant import decoupleQ, minimize_block
+        import shutil
+
+        tick = time.time()
+        llama_sequential_decoupleq(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_pbllm(args, model, testloader, DEV, logger)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+
+    elif args.method == 'owq':
+        from gptq.owq.owq import OWQ_GPTQ
+        from gptq.owq.owq_misc import *
+        from gptq.owq.owq_quant import Quantizer
+        from eval_ppl_utils import llama_eval_owq
+
+        meta = processing_arguments(args)
+
+        tick = time.time()
+        llama_sequential_owq(model, meta, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_owq(args, model, testloader, DEV, logger)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)

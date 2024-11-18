@@ -352,73 +352,12 @@ class BaseLM(LM):
             # import pdb; pdb.set_trace()
             batched_inps = torch.cat(inps, dim=0).to(
                 self.device
-            )  # [batch, padding_length
+            )  # [batch, padding_length]
 
             # self.model = self.model.to(self.device)
             multi_logits = F.log_softmax(
                 self._model_call(batched_inps), dim=-1
             ).cpu()  # [batch, padding_length, vocab]
-
-            # dataset_inps.append(batched_inps)
-            # dataset_logits = self._model_logits_on_dataset(dataset_inps)
-            # iter = 0
-            # for chunk in chunks(
-            #         tqdm(re_ord.get_reordered(), disable=disable_tqdm), self.batch_size
-            # ):
-            #     multi_logits = dataset_logits[iter]
-            #     iter+=1
-            #     inps = []
-            #     cont_toks_list = []
-            #     inplens = []
-            #
-            #     padding_length = None
-            #
-            #     # because vectorizing is annoying, we first convert each (context, continuation) pair to padded
-            #     # tensors, then we pack them together into a batch, call the model, and then pick it all apart
-            #     # again because vectorizing is annoying
-            #
-            #     # todo: check if we realy nead the following loop
-            #     for _, context_enc, continuation_enc in chunk:
-            #         # sanity check
-            #         assert len(context_enc) > 0
-            #         assert len(continuation_enc) > 0
-            #         assert len(continuation_enc) <= self.max_length
-            #
-            #         # how this all works:
-            #         #          CTX      CONT
-            #         # inp    0 1 2 3|4 5 6 7 8 9   <- last token is deleted by inp[:, :-1]
-            #         # gpt2    \               \
-            #         # logits   1 2 3|4 5 6 7 8 9   <- the ctx half gets tossed out by the
-            #         # cont_toks      4 5 6 7 8 9      [:, -len(continuation_enc):, :self.vocab_size] slice
-            #
-            #         # when too long to fit in context, truncate from the left
-            #         inp = torch.tensor(
-            #             (context_enc + continuation_enc)[-(self.max_length + 1):][:-1],
-            #             dtype=torch.long,
-            #         ).to(self.device)
-            #         (inplen,) = inp.shape
-            #
-            #         cont = continuation_enc
-            #
-            #         # since in _collate we make sure length is descending, the longest is always the first one.
-            #         padding_length = (
-            #             padding_length if padding_length is not None else inplen
-            #         )
-            #
-            #         # pad length from seq to padding_length
-            #         inp = torch.cat(
-            #             [
-            #                 inp,  # [seq]
-            #                 torch.zeros(padding_length - inplen, dtype=torch.long).to(
-            #                     inp.device
-            #                 ),  # [padding_length - seq]
-            #             ],
-            #             dim=0,
-            #         )
-            #
-            #         inps.append(inp.unsqueeze(0))  # [1, padding_length]
-            #         cont_toks_list.append(cont)
-            #         inplens.append(inplen)
 
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
