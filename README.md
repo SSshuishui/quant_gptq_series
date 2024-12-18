@@ -4,17 +4,17 @@
 Include:
 | Methods | Quantize | PPL Eval | Task Eval | Save |
 | :--- | ---: | :---: | :---: | :---: 
-| GPTQ | ✅ | ✅ | TODO | TODO 
-| PB-LLM | ✅ | ✅ | TODO | TODO 
-| BiLLM | ✅ | ✅ | TODO | TODO 
-| CLAQ | ✅ | ✅ | TODO | TODO 
-| Z-Fold（llama1,2） | ✅ | ✅ | TODO | TODO 
-| Slim | ✅ | ✅ | TODO | TODO 
-| QuIP | ✅ | ✅ | TODO | TODO 
-| AWRQ | TODO | TODO | TODO | TODO 
+| GPTQ | yes | yes | TODO | TODO 
+| PB-LLM | yes | yes | TODO | TODO 
+| BiLLM | yes | yes | TODO | TODO 
+| CLAQ | yes | yes | TODO | TODO 
+| Z-Fold（llama1,2） | yes | yes | TODO | TODO 
+| Slim | yes | yes | TODO | TODO 
+| QuIP | yes | yes | TODO | TODO 
+| AWRQ | yes | yes | TODO | TODO 
 | DecoupleQ | TODO | TODO | TODO | TODO 
-| OWQ | TODO | TODO | TODO | TODO 
-| GPTVQ | TODO | TODO | TODO | TODO 
+| OWQ | yes | yes | TODO | TODO 
+| GPTVQ | yes | yes | TODO | TODO 
 
 #### GPTQ for LLaMA families
 ```
@@ -100,21 +100,19 @@ python llama.py --columns-per-group 256 --use-vq --kmeans-iters 100 --kmeans-ini
 #### DecoupleQ for LLaMA families
 ```
 python llama.py \
---method decoupleq \
+--method decoupleQ \
 --model ${MODEL_DIR} \
---dataset c4\
---true-sequential \
+--dataset c4 \
+--true_sequential \
 --act_order \
---new-eval \
 --wbits 2 \
---group-size -1 \
---max-iter-num 4 \
---iters-before-round 200 \
---inner-iters-for-round 5 \
---blockwise-minimize-epoch 4 \
---round-fn gptq \
---blockwise-minimize-lr 1.0e-5 \
---train-LN \
+--max_iter_num 4 \
+--iters_before_round 200 \
+--inner_iters_for_round 5 \
+--blockwise_minimize_epoch 4 \
+--round_fn gptq \
+--blockwise_minimize_lr 1.0e-5 \
+--train_LN \
 --save
 ```
 

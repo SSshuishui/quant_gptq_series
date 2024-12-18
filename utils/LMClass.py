@@ -75,6 +75,7 @@ class LMClass(BaseLM):
         logits returned from the model
         """
         with torch.no_grad():
+            print("inps: ", inps, inps.shape)
             return self.model(inps.to(self._device))["logits"]
 
     def model_batched_set(self, inps):

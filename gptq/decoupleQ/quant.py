@@ -3,7 +3,7 @@ Copyright (2024) Bytedance Ltd. and/or its affiliates
 """
 import torch
 import torch.nn as nn
-from decoupleQ.moq_quant import Quantizer, repeat_interleave, opt_intW3
+from .moq_quant import Quantizer, repeat_interleave, opt_intW3
 import torch.nn.functional as F
 
 
@@ -359,13 +359,13 @@ def minimize_block(args, quantizers, layer, inps, dev, layer_num, masks):
         full[key].weight.data = weight.to(**factory_kwargs)
         full[key].weight.requires_grad_(False)
         scale = torch.nn.Parameter(scale_list[0].clone().to(**factory_kwargs), requires_grad=True)
-        requires_grad = True if args.asym else False
+        requires_grad = True if args.sym else False
         zero = torch.nn.Parameter(scale_list[1].clone().to(**factory_kwargs), requires_grad=requires_grad)
         full[key].register_parameter("scale", scale)
         full[key].register_parameter("zero", zero)
-        full[key].group_size = args.group_size
+        full[key].group_size = args.groupsize
         params.append(scale)
-        if args.asym:
+        if args.sym:
             params.append(zero)
 
     if args.train_LN:
