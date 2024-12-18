@@ -4,17 +4,17 @@
 Include:
 | Methods | Quantize | PPL Eval | Task Eval | Save |
 | :--- | ---: | :---: | :---: | :---: 
-| GPTQ | yes | yes | TODO | TODO 
-| PB-LLM | yes | yes | TODO | TODO 
-| BiLLM | yes | yes | TODO | TODO 
-| CLAQ | yes | yes | TODO | TODO 
-| Z-Fold（llama1,2） | yes | yes | TODO | TODO 
-| Slim | yes | yes | TODO | TODO 
-| QuIP | yes | yes | TODO | TODO 
+| [GPTQ](https://arxiv.org/pdf/2210.17323) | yes | yes | TODO | TODO 
+| [PB-LLM](https://arxiv.org/pdf/2310.00034) | yes | yes | TODO | TODO 
+| [BiLLM](https://arxiv.org/pdf/2402.04291) | yes | yes | TODO | TODO 
+| [CLAQ](https://arxiv.org/pdf/2405.17233) | yes | yes | TODO | TODO 
+| [Z-Fold](https://aclanthology.org/2023.emnlp-main.892.pdf)（llama1,2） | yes | yes | TODO | TODO 
+| [Slim](https://arxiv.org/pdf/2405.14917) | yes | yes | TODO | TODO 
+| [QuIP](https://arxiv.org/pdf/2307.13304) | yes | yes | TODO | TODO 
 | AWRQ | yes | yes | TODO | TODO 
-| DecoupleQ | TODO | TODO | TODO | TODO 
-| OWQ | yes | yes | TODO | TODO 
-| GPTVQ | yes | yes | TODO | TODO 
+| [DecoupleQ](https://arxiv.org/pdf/2404.12759) | TODO | TODO | TODO | TODO 
+| [OWQ](https://arxiv.org/pdf/2306.02272) | yes | yes | TODO | TODO 
+| [GPTVQ](https://arxiv.org/pdf/2402.15319) | yes | yes | TODO | TODO 
 
 #### GPTQ for LLaMA families
 ```
