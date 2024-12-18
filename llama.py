@@ -1636,6 +1636,137 @@ def llama_sequential_decoupleq(model, dataloader, dev):
     model.config.use_cache = use_cache
     return quantizers
 
+@torch.no_grad()
+def llama_sequential_magr(model, dataloader, dev):
+    logger.info("Starting ...")
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.layers
+
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
+    
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {'i': 0, 'attention_mask': None, 'position_ids': None}
+    
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            cache['i'] += 1
+            cache['attention_mask'] = kwargs['attention_mask']
+            cache['position_ids'] = kwargs['position_ids']
+            raise ValueError        
+    layers[0] = Catcher(layers[0])
+
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache['attention_mask']
+    position_ids = cache['position_ids']
+
+    logger.info('Ready.')
+    start_time = time.time()
+
+    beta = 1
+    CD_iter = 1
+    if args.wbits == 2:
+        beta = 0.8
+        CD_iter = 30
+    elif args.wbits == 3:
+        beta = 0.9
+
+    quantizers = {}
+    hf_device_map = model.hf_device_map
+    for i in range(len(layers)):
+        logger.info(f"================={i}==================")
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
+
+        full = find_layers(layer)
+        if args.true_sequential:
+            sequential = [
+                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
+                ['self_attn.o_proj'],
+                ['mlp.up_proj', 'mlp.gate_proj'],
+                ['mlp.down_proj']
+            ]
+        else:
+            sequential = [list(full.keys())]
+
+        for k, names in enumerate(sequential):
+            subset = {n: full[n] for n in names}
+
+            gptq = {}
+            for name in subset:
+                gptq[name] = MagRGPTQ(subset[name])
+                gptq[name].quantizer = Quantizer()
+                gptq[name].quantizer.configure(
+                    args.wbits, perchannel=True, sym=args.sym, mse=False, beta=beta,
+                )
+
+            def add_batch(name):
+                def tmp(module, inp, out):
+                    gptq[name].add_batch(inp[0].data, out.data)
+                return tmp
+
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+            for h in handles:
+                h.remove()
+
+            for name in names:
+                print(i, name)
+                logger.info('Quantizing ...')
+                gptq[name].fasterquant(
+                    percdamp=args.percdamp, 
+                    groupsize=args.groupsize, 
+                    actorder=args.act_order, 
+                    static_groups=args.static_groups,
+                    magr=args.magr, 
+                    CD_iter=CD_iter
+                )
+                quantizers['model.layers.%d.%s' % (i, name)] = gptq[name].quantizer
+                gptq[name].free()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gptq
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+    end_time = time.time()
+
+    print(f'\nTime used for evaluation: {end_time - start_time}\n')
+
+
 
 
 def llama_pack3(model, quantizers):
@@ -1800,7 +1931,7 @@ if __name__ == '__main__':
         help='Whether to run in true sequential model.'
     )
     parser.add_argument(
-        '--static-groups', action='store_true',
+        '--static_groups', action='store_true',
         help='Whether to use static groups; recommended when using `--actorder` for more efficient inference.'
     )
     parser.add_argument("--tasks",  type=str, default="", help="Task datasets Evaluate")
@@ -1884,6 +2015,10 @@ if __name__ == '__main__':
     parser.add_argument('--train_LN', action='store_true', help='Whether to train the parameters in norm')
     parser.add_argument('--train_bias', action='store_true', help='Whether to train the bias in linear layer')
 
+    # For MagR
+    parser.add_argument('--magr', action='store_true', help='Whether to apply the MagR process.')
+
+
     args = parser.parse_args()
 
     # init logger
@@ -1903,9 +2038,9 @@ if __name__ == '__main__':
     logger.info(f"Dataset {args.dataset} Loaded!")
 
     if args.method == 'gptq' and args.wbits < 16 and not args.nearest:
-        from gptq.gptq import *
-        from gptq.quant import *
-        from eval_ppl_utils import llama_eval_gptq_claq
+        from gptq.gptq import GPTQ
+        from gptq.quant import Quantizer
+        from eval_ppl_utils import llama_eval_ppl
 
         model = model.to(DEV)
 
@@ -1918,7 +2053,7 @@ if __name__ == '__main__':
         #         dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
         #     )
         #     logger.info(dataset)
-        #     llama_eval_gptq_claq(args, model, testloader, DEV, logger)
+        #     llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.tasks != "":
             from eval_ppl_utils import zeroshot_evaluate
@@ -1934,10 +2069,10 @@ if __name__ == '__main__':
         from gptq.bigptq import BRAGPTQ
         from gptq.binary import Binarization 
         from gptq.quant import *
-        from eval_ppl_utils import llama_eval_billm
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
-        quantizers = llama_sequential_billm(model, dataloader, DEV)
+        llama_sequential_billm(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
@@ -1945,7 +2080,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_billm(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -1956,7 +2091,7 @@ if __name__ == '__main__':
         from gptq.gptq_zfold import GPTQ
         from gptq.quant import ZFoldQuantizer
         from gptq.zfold import *
-        from eval_ppl_utils import llama_eval_zfold
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
         quantizers = llama_sequential_zfold(model, dataloader, DEV, args.wbits, args.salient_metric, args.use_zfold)
@@ -1969,7 +2104,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_zfold(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
         
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -1979,7 +2114,7 @@ if __name__ == '__main__':
     elif args.method == 'claq' and args.wbits < 16 and not args.nearest:
         from gptq.claq import CLAQ
         from gptq.claq_quant import *
-        from eval_ppl_utils import llama_eval_gptq_claq
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
         quantizers = llama_sequential_claq(model, dataloader, DEV)
@@ -1990,7 +2125,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_gptq_claq(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2000,7 +2135,7 @@ if __name__ == '__main__':
     elif args.method == 'pbllm':
         from gptq.pbllm import LowHighGPT
         from gptq.quant import LowQuantizer, HighQuantizer
-        from eval_ppl_utils import llama_eval_pbllm
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
         llama_sequential_pbllm(model, dataloader, DEV)
@@ -2011,7 +2146,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_lowfeac{args.low_frac}_highbit{args.high_bit}_seed{args.seed}"
@@ -2021,7 +2156,7 @@ if __name__ == '__main__':
     elif args.method == 'quip':
         from gptq.quip.gptq import QuIP_GPTQ
         from gptq.quip.quant import *
-        from eval_ppl_utils import llama_eval_quip
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
         llama_sequential_quip(model, dataloader, DEV)
@@ -2032,7 +2167,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_quip(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2042,7 +2177,7 @@ if __name__ == '__main__':
     elif args.method == 'slim':
         from gptq.slim.slim import SliM_Quantizer
         from gptq.slim.slim_gptq import SliMGPTQ
-        from eval_ppl_utils import llama_eval_slim_awrq
+        from eval_ppl_utils import llama_eval_ppl
 
         # get the block precision of the model
         # if the block precision does not exist, start Salience-Determined Bit Allocation
@@ -2063,7 +2198,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_slim_awrq(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
         
         if args.tasks != "":
             from eval_ppl_utils import zeroshot_evaluate
@@ -2076,7 +2211,7 @@ if __name__ == '__main__':
     
     elif args.method == 'awrq':
         from gptq.awrq import *
-        from eval_ppl_utils import llama_eval_slim_awrq
+        from eval_ppl_utils import llama_eval_ppl
         from gptq.awrq_quant import replace_linear_layer, AWRQQuantizer, find_layers
 
         tick = time.time()
@@ -2088,7 +2223,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_slim_awrq(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2098,7 +2233,7 @@ if __name__ == '__main__':
     elif args.method == 'gptvq' and args.wbits < 16:
         from gptq.gptvq.gptvq import *
         from gptq.gptvq.vq_quant import VQQuantizer
-        from eval_ppl_utils import llama_eval_gptvq
+        from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()  
         llama_sequential_gptvq(model, dataloader, DEV)
@@ -2109,22 +2244,17 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_gptvq(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
-            from transformers import AutoTokenizer
-            from transformers.training_args import TrainingArguments
-            save_file = "./qmodel/gptvq/"
-
-            os.makedirs(save_file, exist_ok=True)
-            tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
-            new_args = TrainingArguments(no_cuda=True, output_dir=save_file)
-            trainer = transformers.Trainer(model=model, tokenizer=tokenizer, args=new_args)
-            trainer.save_model(save_file)
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
 
     elif args.method == 'decoupleQ':
         from gptq.decoupleQ.quant import decoupleQ, minimize_block
         from gptq.decoupleQ.moq_quant import Quantizer
+        from eval_ppl_utils import llama_eval_ppl
         import shutil
 
         tick = time.time()
@@ -2136,7 +2266,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_pbllm(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2147,7 +2277,7 @@ if __name__ == '__main__':
         from gptq.owq.owq import OWQ_GPTQ
         from gptq.owq.owq_misc import *
         from gptq.owq.owq_quant import Quantizer
-        from eval_ppl_utils import llama_eval_owq
+        from eval_ppl_utils import llama_eval_ppl
 
         meta = processing_arguments(args)
 
@@ -2160,7 +2290,28 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
-            llama_eval_owq(args, model, testloader, DEV, logger)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+
+    elif args.method == 'magr':
+        from gptq.MagR import MagRGPTQ
+        from gptq.quant import Quantizer
+        from eval_ppl_utils import llama_eval_ppl
+
+        tick = time.time()
+        llama_sequential_magr(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"

@@ -15,6 +15,7 @@ Include:
 | [DecoupleQ](https://arxiv.org/pdf/2404.12759) | TODO | TODO | TODO | TODO 
 | [OWQ](https://arxiv.org/pdf/2306.02272) | yes | yes | TODO | TODO 
 | [GPTVQ](https://arxiv.org/pdf/2402.15319) | yes | yes | TODO | TODO 
+| [MagR](https://arxiv.org/pdf/2406.00800) | yes | yes | TODO | TODO 
 
 #### GPTQ for LLaMA families
 ```
@@ -91,12 +92,6 @@ python llama.py --method awrq --model ${MODEL_DIR} --dataset c4 --wbits 4 --act_
 ```
 
 
-#### GPTVQ
-python llama.py --columns-per-group 256 --use-vq --kmeans-iters 100 --kmeans-init-method mahalanobis --hessian-weighted-lookups --wbits 2 --vq-dim 1 --groupsize 512 $LLAMA2_7B_PATH wikitext2
-python llama.py --columns-per-group 256 --use-vq --kmeans-iters 100 --kmeans-init-method mahalanobis --hessian-weighted-lookups --wbits 2 --vq-dim 1 --groupsize 512 --include-m-step $LLAMA2_7B_PATH wikitext2
-
-
-
 #### DecoupleQ for LLaMA families
 ```
 python llama.py \
@@ -126,3 +121,11 @@ python llama.py --method owq --model ${MODEL_DIR} --dataset c4 --wbits 3 --targe
 ```
 python llama.py --method owq --model ${MODEL_DIR} --dataset c4 --wbits 4 --target_bit 4.01
 ```
+
+#### GPTVQ
+python llama.py --columns-per-group 256 --use-vq --kmeans-iters 100 --kmeans-init-method mahalanobis --hessian-weighted-lookups --wbits 2 --vq-dim 1 --groupsize 512 $LLAMA2_7B_PATH wikitext2
+python llama.py --columns-per-group 256 --use-vq --kmeans-iters 100 --kmeans-init-method mahalanobis --hessian-weighted-lookups --wbits 2 --vq-dim 1 --groupsize 512 --include-m-step $LLAMA2_7B_PATH wikitext2
+
+
+#### MagR
+python llama.py --method magr --model ${MODEL_DIR} --dataset c4 --wbits 4 --magr
