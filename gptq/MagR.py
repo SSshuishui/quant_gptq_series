@@ -15,7 +15,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
 
-class MagRGPTQ:
+class MagR:
 
     def __init__(self, layer):
         self.layer = layer

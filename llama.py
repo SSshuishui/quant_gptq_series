@@ -1574,6 +1574,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
 
         for k, names in enumerate(sequential):
             subset = {n: full[n] for n in names}
+
             moq = {}
             for name in subset:
                 moq[name] = decoupleQ(subset[name], name=f"layer.{i}.{name}")
@@ -1594,7 +1595,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
             for h in handles:
                 h.remove()
 
-            for name in names:
+            for name in subset:
                 del subset[name].mask
                 print(i, name)
                 logger.info('Quantizing ...')
@@ -1718,7 +1719,7 @@ def llama_sequential_magr(model, dataloader, dev):
 
             gptq = {}
             for name in subset:
-                gptq[name] = MagRGPTQ(subset[name])
+                gptq[name] = MagR(subset[name])
                 gptq[name].quantizer = Quantizer()
                 gptq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.sym, mse=False, beta=beta,
@@ -1737,7 +1738,7 @@ def llama_sequential_magr(model, dataloader, dev):
             for h in handles:
                 h.remove()
 
-            for name in names:
+            for name in subset:
                 print(i, name)
                 logger.info('Quantizing ...')
                 gptq[name].fasterquant(
@@ -1767,6 +1768,144 @@ def llama_sequential_magr(model, dataloader, dev):
     print(f'\nTime used for evaluation: {end_time - start_time}\n')
 
 
+@torch.no_grad()
+def llama_sequential_spqr(model, dataloader, dev):
+    logger.info("Starting ...")
+
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    layers = model.model.layers
+
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
+    layers[0] = layers[0].to(dev)
+    
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+    cache = {'i': 0, 'attention_mask': None, 'position_ids': None}
+    
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            cache['i'] += 1
+            cache['attention_mask'] = kwargs['attention_mask']
+            cache['position_ids'] = kwargs['position_ids']
+            raise ValueError        
+    layers[0] = Catcher(layers[0])
+
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.model.norm.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    attention_mask = cache['attention_mask']
+    position_ids = cache['position_ids']
+
+    logger.info('Ready.')
+    start_time = time.time()
+
+    normal_outlier_count_global, w_count_global = 0, 0
+
+    quantizers = {}
+    hf_device_map = model.hf_device_map
+    for i in range(len(layers)):
+        logger.info(f"================={i}==================")
+        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        layer = layers[i].to(hf_device)
+        inps = inps.to(hf_device)
+        position_ids = position_ids.to(hf_device)
+
+        normal_outlier_count, w_count = 0, 0
+        stats_payload = {}
+
+        full = find_layers(layer)
+        if args.true_sequential:
+            sequential = [
+                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
+                ['self_attn.o_proj'],
+                ['mlp.up_proj', 'mlp.gate_proj'],
+                ['mlp.down_proj']
+            ]
+        else:
+            sequential = [list(full.keys())]
+
+        for k, names in enumerate(sequential):
+            subset = {n: full[n] for n in names}
+
+            gptq = {}
+            for name in subset:
+                gptq[name] = SpQR(subset[name])
+
+            def add_batch(name):
+                def tmp(module, inp, out):
+                    gptq[name].add_batch(inp[0].data, out.data)
+                return tmp
+
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+            for h in handles:
+                h.remove()
+
+            for name in subset:
+                print(i, name)
+                logger.info('Quantizing ...')
+                quantized = gptq[name].quantize(
+                    percdamp=args.percdamp, 
+                    bits=args.wbits,
+                    groupsize=args.groupsize,
+                    sym=args.sym,
+                    perchannel=True,
+                    qq_groupsize=args.qq_groupsize,
+                    round_zero=args.round_zero,
+                    qq_scale_bits=args.qq_scale_bits,
+                    qq_zero_bits=args.qq_zero_bits,
+                    qq_zero_sym=args.qq_zero_sym,
+                    outlier_relative_threshold=args.outlier_threshold,
+                    permutation_order=args.permutation_order,
+                    simplified_outliers=args.simplified_outliers,
+                    save_quantization=args.save,
+                )
+                gptq[name].layer.weight.data = quantized.weight.to(
+                    gptq[name].layer.weight.data.dtype
+                )
+                quantizers["model.layers.%d.%s" % (i, name)] = ()
+
+                # OUTLIER STATS per module:
+                normal_outliers_count = quantized.unstructured_outlier_mask.to(torch.int32).sum()
+                stats_payload[f"n_{name}_ol_share"] = (normal_outliers_count / quantized.weight.numel()).item()
+                normal_outlier_count += normal_outliers_count.item()
+                w_count += quantized.weight.numel()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gptq
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+
+    model.config.use_cache = use_cache
+    end_time = time.time()
+
+    print(f'\nTime used for evaluation: {end_time - start_time}\n')
 
 
 def llama_pack3(model, quantizers):
@@ -1809,7 +1948,6 @@ def z_folding(model, quantizers):
 
 
 def smoothing_layer(layer, subset, awrq, inps, attention_mask, position_ids, outs):
-
     def add_batch_act_scales(name):
         def tmp(_, inp, out):
             awrq[name].add_batch_act_scales(inp[0].data, out.data)
@@ -2017,6 +2155,16 @@ if __name__ == '__main__':
 
     # For MagR
     parser.add_argument('--magr', action='store_true', help='Whether to apply the MagR process.')
+
+    # For SpQR
+    parser.add_argument("--permutation_order", type=str, default="identity", help="Weights permutation order; options: identity(default), spearman, act_order")
+    parser.add_argument("--qq_scale_bits", type=int, default=None, help="Quantize quantization scale with this many bits (default=do not quantize)",)
+    parser.add_argument("--round_zero", type=int, default=None, help='whether to allow non-integer "zero" when quantizing weights non-symmetrically',)
+    parser.add_argument("--qq_zero_bits", type=int, default=None, help='Quantize quantization "zero" with this many bits (default=do not quantize)',)
+    parser.add_argument("--qq_zero_sym", action="store_true", help="enable sym=True in meta-quantization for groupwise zero, specifically",)
+    parser.add_argument("--qq_groupsize", type=int, default=16, help="Quantize quantization scale in groups of this many scales")
+    parser.add_argument("--outlier_threshold", type=float, default=float("inf"),help="relative threshold for     outliers; higher threshold = more outliers.")
+    parser.add_argument("--simplified_outliers", action="store_true", help="do not perform leave-one-out evaluation when detecting outliers; works faster, but generally worse in perplexity")
 
 
     args = parser.parse_args()
@@ -2298,12 +2446,32 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), save_file)
 
     elif args.method == 'magr':
-        from gptq.MagR import MagRGPTQ
+        from gptq.MagR import MagR
         from gptq.quant import Quantizer
         from eval_ppl_utils import llama_eval_ppl
 
         tick = time.time()
         llama_sequential_magr(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'ptb', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+
+    elif args.method == 'spqr':
+        from gptq.SpQR import SpQR
+        from eval_ppl_utils import llama_eval_ppl
+
+        tick = time.time()
+        llama_sequential_spqr(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
         for dataset in ['wikitext2', 'ptb', 'c4']:
