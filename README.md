@@ -12,7 +12,7 @@ Include:
 | [Slim](https://arxiv.org/pdf/2405.14917) | yes | yes | TODO | TODO 
 | [QuIP](https://arxiv.org/pdf/2307.13304) | yes | yes | TODO | TODO 
 | AWRQ | yes | yes | TODO | TODO 
-| [DecoupleQ](https://arxiv.org/pdf/2404.12759) | TODO | TODO | TODO | TODO 
+| [DecoupleQ](https://arxiv.org/pdf/2404.12759) | yes | yes | TODO | TODO 
 | [OWQ](https://arxiv.org/pdf/2306.02272) | yes | yes | TODO | TODO 
 | [GPTVQ](https://arxiv.org/pdf/2402.15319) | yes | yes | TODO | TODO 
 | [MagR](https://arxiv.org/pdf/2406.00800) | yes | yes | TODO | TODO 
