@@ -56,6 +56,7 @@ class MagR:
         
         self.X = inp.t().float()
         self.XtX += inp.float().matmul(inp.float().t()) 
+        
         self.H *= self.nsamples / (self.nsamples + tmp)
         self.nsamples += tmp
         
@@ -97,10 +98,9 @@ class MagR:
         dead = torch.diag(H) == 0
         
         H[dead, dead] = 1
-        
+    
         W[:, dead] = 0
         
-
         if static_groups:
             import copy
             groups = []
@@ -119,10 +119,9 @@ class MagR:
         Q = torch.zeros_like(W)
 
         damp = percdamp * torch.mean(torch.diag(H))
-        
         diag = torch.arange(self.columns, device=self.dev)
-        
         H[diag, diag] += damp
+
         H = torch.linalg.cholesky(H)
         H = torch.cholesky_inverse(H)
         H = torch.linalg.cholesky(H, upper=True)
@@ -133,7 +132,6 @@ class MagR:
             count = i2 - i1
             
             W1 = W[:, i1:i2].clone()
-            
             Q1 = torch.zeros_like(W1)
             Err1 = torch.zeros_like(W1)
             Losses1 = torch.zeros_like(W1)

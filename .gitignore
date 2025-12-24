@@ -6,3 +6,4 @@ outputs/
 *.log
 *.txt
 tmp_blockwise/
+global_indices/

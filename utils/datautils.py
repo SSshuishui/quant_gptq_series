@@ -53,10 +53,10 @@ def get_ptb(nsamples, seed, seqlen, model):
 
 def get_c4(nsamples, seed, seqlen, model):
     traindata = load_dataset(
-        'bhxiang/c4_calibrate_mini', split='train', cache_dir="/data/huggingface_cache/datasets"
+        'bhxiang/c4_calibrate_mini', split='train'
     )
     valdata = load_dataset(
-        'bhxiang/c4_calibrate_mini', split='validation', cache_dir="/data/huggingface_cache/datasets"
+        'bhxiang/c4_calibrate_mini', split='validation'
     )
     
     tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)

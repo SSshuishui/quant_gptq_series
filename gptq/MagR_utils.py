@@ -68,6 +68,7 @@ def linfty_proximal(x, scale):
     assert scale != 0
     return x - scale * project_onto_l1_ball(x / scale)
 
+
 # this is one sample
 def W_proximal_preprocess(W, X, device, alpha=0.001, n_iter=200):
     

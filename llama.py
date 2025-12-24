@@ -103,7 +103,7 @@ def llama_sequential_gptq(model, dataloader, dev):
         
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -223,7 +223,7 @@ def llama_sequential_billm(model, dataloader, dev):
     
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -332,7 +332,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
     quantizers = {}
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -381,7 +381,7 @@ def llama_sequential_zfold(model, dataloader, dev, nbits, salient_metric, use_zf
                 H[dead, dead] = 1
                 percdamp = 0.01
                 damp = percdamp * torch.mean(torch.diag(H))
-                diag = torch.arange(gptq["self_attn.q_proj"].columns, device=f"cuda:{hf_device_map[f'model.layers.{i}']}")
+                diag = torch.arange(gptq["self_attn.q_proj"].columns, device="cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}")
                 H[diag, diag] += damp
 
                 # zfold share QKV
@@ -534,7 +534,7 @@ def llama_sequential_claq(model, dataloader, dev):
     quantizers = {}
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -688,7 +688,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
 
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -760,6 +760,7 @@ def llama_sequential_pbllm(model, dataloader, dev):
         plt.savefig("./outputs/" + title.replace("/", "_") + ".jpg")
 
     model.config.use_cache = use_cache
+
 
 @torch.no_grad()
 def llama_sequential_quip(model, dataloader, dev):
@@ -841,7 +842,7 @@ def llama_sequential_quip(model, dataloader, dev):
 
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -997,7 +998,7 @@ def llama_sequential_slim(model, dataloader, dev, saved_block_precision):
 
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -1145,7 +1146,7 @@ def llama_sequential_awrq(model, dataloader, dev):
     quantizers = {}
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -1273,7 +1274,7 @@ def llama_sequential_gptvq(model, dataloader, dev):
         
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -1419,7 +1420,7 @@ def llama_sequential_owq(model, meta, dataloader, dev):
         
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         
         full = find_layers(layer)
@@ -1555,7 +1556,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
 
     for i in range(len(layers)):
         logger.info(f"================={i}==================")
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         t_layer0 = time.time()
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
@@ -1572,7 +1573,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
         else:
             sequential = [list(full.keys())]
 
-        for k, names in enumerate(sequential):
+        for names in sequential:
             subset = {n: full[n] for n in names}
 
             moq = {}
@@ -1637,6 +1638,7 @@ def llama_sequential_decoupleq(model, dataloader, dev):
     model.config.use_cache = use_cache
     return quantizers
 
+
 @torch.no_grad()
 def llama_sequential_magr(model, dataloader, dev):
     logger.info("Starting ...")
@@ -1696,9 +1698,10 @@ def llama_sequential_magr(model, dataloader, dev):
 
     quantizers = {}
     hf_device_map = model.hf_device_map
+
     for i in range(len(layers)):
         logger.info(f"================={i}==================")
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -1714,7 +1717,7 @@ def llama_sequential_magr(model, dataloader, dev):
         else:
             sequential = [list(full.keys())]
 
-        for k, names in enumerate(sequential):
+        for names in sequential:
             subset = {n: full[n] for n in names}
 
             gptq = {}
@@ -1817,13 +1820,11 @@ def llama_sequential_spqr(model, dataloader, dev):
     logger.info('Ready.')
     start_time = time.time()
 
-    normal_outlier_count_global, w_count_global = 0, 0
-
     quantizers = {}
     hf_device_map = model.hf_device_map
     for i in range(len(layers)):
         logger.info(f"================={i}==================")
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -1842,7 +1843,7 @@ def llama_sequential_spqr(model, dataloader, dev):
         else:
             sequential = [list(full.keys())]
 
-        for k, names in enumerate(sequential):
+        for names in sequential:
             subset = {n: full[n] for n in names}
 
             gptq = {}
@@ -1928,7 +1929,7 @@ def z_folding(model, quantizers):
     hf_device_map = model.hf_device_map
     logger.info(hf_device_map)
     for i in range(len(layers)):
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         subset = find_layers(layer)
         for name in subset:
@@ -1992,11 +1993,177 @@ def smoothing_layer(layer, subset, awrq, inps, attention_mask, position_ids, out
         h.remove()
 
 
+@torch.no_grad()
+def extract_outlieridx(model, meta, dataloader, dev, args):
+    if args.perhead is not None:
+        args.target_rank = args.perhead * model.config.num_attention_heads
+        
+    dirname = os.path.join(args.output_dir, f"w{args.wbits}_r{args.target_rank}")
+    if not os.path.exists(dirname):
+        os.makedirs(dirname, exist_ok=True)
+        
+    d = model.get_input_embeddings().weight.shape[1]
+    sensitivity_sum = torch.zeros([d], dtype=torch.float, device=dev)
+    
+    logger.info('Starting ...')
+
+    use_cache = model.config.use_cache
+    layers, pre_layers, _ = parsing_layers(model, meta)
+    model.config.use_cache = False
+    
+    for pre_layer in pre_layers:
+        pre_layer = pre_layer.to(dev)
+    
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, args.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+
+    cache = {kw:None for kw in meta['inp_kwargs']}
+    cache['i'] = 0
+
+    class Catcher(nn.Module):
+        def __init__(self, module):
+            super().__init__()
+            self.module = module
+        def forward(self, inp, **kwargs):
+            inps[cache['i']] = inp
+            for key in cache:
+                if key == 'i':
+                    cache['i'] += 1
+                else:
+                    cache[key] = kwargs[key]
+            raise ValueError
+    
+    layers[0] = Catcher(layers[0])
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    
+    layers[0] = layers[0].module.cpu()
+    
+    for pre_layer in pre_layers:
+        pre_layer = pre_layer.cpu()
+    torch.cuda.empty_cache()
+
+    outs = torch.zeros_like(inps)
+    del cache['i']
+    inp_kwargs = cache
+
+    print('Ready.')
+
+    owq_layers = args.meta['owq_layers']
+    ratios = args.meta['ratios']
+    n_out_dict = {l:0 for l in owq_layers.keys()}
+    if args.target_bit is not None:
+        n_owq_layers = sum(owq_layers.values())
+        
+        r = (12 / (16 - args.wbits)) * (args.target_bit - args.wbits)
+        r /= n_owq_layers
+
+        layer = find_layers(layers[0], layers=[nn.Linear])
+        
+        for l in owq_layers:
+            # for even number of n_out
+            n_out = round(layer[l].weight.data.shape[1] * r * ratios[l])
+            if n_out % 2 == 1: n_out += 1
+            n_out_dict[l] = n_out
+    elif args.target_rank is not None:
+        for l in owq_layers:
+            n_out_dict[l] = args.target_rank
+    
+    for i in range(len(layers)):
+        layer = layers[i].to(dev)
+        block_layers = find_layers(layer, layers=[nn.Linear])
+
+        if args.true_sequential:
+            sequential = meta['sequential']
+        else:
+            sequential = [list(block_layers.keys())]
+       
+        for names in sequential:
+            subset = {n: block_layers[n] for n in names}
+
+            gptq_owq = {}
+            for name in subset:
+                gptq_owq[name] = OWQ_GPTQ(subset[name], n_out=n_out_dict[name])
+                gptq_owq[name].quantizer = Quantizer(
+                    args.wbits, perchannel=True, sym=args.sym, mse=(args.tuning == 'mse'), group_size=args.groupsize
+                )
+                gptq_owq[name].quantizer.n_out = n_out_dict[name]
+                
+            def add_batch(name):
+                def tmp(_, inp, out):
+                    gptq_owq[name].add_batch(inp[0].data, out.data)
+                return tmp
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                layer(inps[j].unsqueeze(0), **inp_kwargs)
+            for h in handles:
+                h.remove()
+            
+            for name in meta['sequential'][0] + meta['sequential'][2]:
+                if not args.no_frob_norm:
+                    W = subset[name].weight.data.clone().to(torch.float)
+                    temp_quantizer = Quantizer(
+                        args.wbits, perchannel=True, sym=args.sym, mse=(args.tuning == 'mse'), group_size=args.groupsize
+                    )
+                    temp_quantizer.find_params(W, weight=True, num=30)
+                    W_quant = temp_quantizer.quantize(W)
+                    frob_norm_error = (W - W_quant).pow(2).sum(dim=0)
+                else:
+                    frob_norm_error = None
+                out_ids = gptq_owq[name].hessian_sorting(actorder=args.act_order, frob_norm=frob_norm_error)
+                gptq_owq[name].quantizer.out_ids = out_ids
+                
+            # for name in subset: # all
+            for name in meta['sequential'][0] + meta['sequential'][2]: # qkv, upgate
+                print(f"Quantizing {meta['prefix']}.{i}.{name}")
+                
+                # before
+                # out_ids = gptq_owq[name].quantizer.out_ids
+                # sensitivity = gptq_owq[name].H_diag[out_ids]
+                # sensitivity_sum[out_ids] += sensitivity / gptq_owq[name].H_diag.mean()
+                
+                # after
+                sensitivity = gptq_owq[name].H_diag
+                sensitivity_sum += sensitivity / sensitivity.mean()
+                torch.save(out_ids, os.path.join(dirname, f"{meta['prefix']}.{i}.{name}.pth"))
+                gptq_owq[name].free()
+
+        for j in range(args.nsamples):
+            outs[j] = layer(inps[j].unsqueeze(0), **inp_kwargs)[0]
+
+        layers[i] = layer.cpu()
+        del layer
+        del gptq_owq 
+        torch.cuda.empty_cache()
+
+        inps, outs = outs, inps
+        
+    output_path = os.path.join(dirname, f'outidx.pth')
+    outidx = sorted(torch.topk(sensitivity_sum, args.target_rank).indices.cpu().tolist())
+    print(f"Target rank : {args.target_rank}, nsamples : {args.nsamples}")
+    print(f"OutlierIdx : {outidx}")
+    print(f"outlieridx is saved to {output_path}")
+    torch.save(outidx, output_path)
+    model.config.use_cache = use_cache
+    
+
 if __name__ == '__main__':
     import argparse
     from utils.datautils import *
 
     parser = argparse.ArgumentParser()
+
+    def str2list(s):
+        return [item.strip() for item in s.split(',') if item.strip()]
 
     parser.add_argument(
         '--method', type=str,
@@ -2007,7 +2174,7 @@ if __name__ == '__main__':
         help='LlaMa model to load; pass location of hugginface converted checkpoint.'
     )
     parser.add_argument(
-        '--dataset', type=str, choices=['wikitext2', 'ptb', 'c4'],
+        '--dataset', type=str, choices=['wikitext2', 'c4'],
         help='Where to extract calibration data from.'
     )
     parser.add_argument(
@@ -2044,6 +2211,7 @@ if __name__ == '__main__':
         '--wbits', type=int, default=16, choices=[2, 3, 4, 5, 6, 7, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
     )
+    parser.add_argument("--act_bits", type=int, default=16)
     parser.add_argument(
         '--groupsize', type=int, default=-1,
         help='Groupsize to use for quantization; default uses full row.'
@@ -2072,7 +2240,15 @@ if __name__ == '__main__':
         '--static_groups', action='store_true',
         help='Whether to use static groups; recommended when using `--actorder` for more efficient inference.'
     )
-    parser.add_argument("--tasks",  type=str, default="", help="Task datasets Evaluate")
+    parser.add_argument(
+        "--eval_zeroshot", action="store_true"
+    )
+    parser.add_argument(
+        "--task_list", type=str2list, default=["copa", "piqa", "rte", "boolq", "hellaswag", "winogrande", "arc_easy", "arc_challenge", "openbookqa"]
+    )
+    parser.add_argument(
+        "--lm_eval_batch_size", type=int, default=8
+    )
 
     # For Zfold args
     parser.add_argument("--use_zfold", action='store_true', help="outlier colomn dynamic.")
@@ -2105,7 +2281,6 @@ if __name__ == '__main__':
     parser.add_argument("--lambda_salience", type=float, default=1, help="Percent of the average Hessian diagonal to use for dampening.")
 
     # For AWRQ args
-    parser.add_argument("--act_bits", type=int, default=8)
     parser.add_argument('--act_sym', default=False, action='store_true', help='bits used for inps quantization')
     parser.add_argument("--smooth", default=False, action='store_true', help='smooth')
     parser.add_argument("--alpha", type=float, default=0.50) # smooth param
@@ -2166,6 +2341,12 @@ if __name__ == '__main__':
     parser.add_argument("--outlier_threshold", type=float, default=float("inf"),help="relative threshold for     outliers; higher threshold = more outliers.")
     parser.add_argument("--simplified_outliers", action="store_true", help="do not perform leave-one-out evaluation when detecting outliers; works faster, but generally worse in perplexity")
 
+    # For qeft
+    # for out_proj
+    parser.add_argument('--perhead', type=int, default=None)
+    parser.add_argument('--reorder', action='store_true', help='Whether to reorder matrix.')
+    parser.add_argument('--outidx_file', type=str, default=None)
+
 
     args = parser.parse_args()
 
@@ -2190,28 +2371,29 @@ if __name__ == '__main__':
         from gptq.quant import Quantizer
         from eval_ppl_utils import llama_eval_ppl
 
-        model = model.to(DEV)
+        tick = time.time()
+        quantizers = llama_sequential_gptq(model, dataloader, DEV)
+        logger.info(time.time() - tick)
 
-        # tick = time.time()
-        # quantizers = llama_sequential_gptq(model, dataloader, DEV)
-        # logger.info(time.time() - tick)
+        for dataset in ['wikitext2', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
 
-        # for dataset in ['wikitext2', 'ptb', 'c4']:
-        #     dataloader, testloader = get_loaders(
-        #         dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-        #     )
-        #     logger.info(dataset)
-        #     llama_eval_ppl(args, model, testloader, DEV, logger)
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
-        if args.tasks != "":
-            from eval_ppl_utils import zeroshot_evaluate
-            zeroshot_evaluate(args, model, DEV, logger)
-
-        # if args.save:
-        #     save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
-        #     save_file = "./qmodel/" + save_title + ".pt"
-        #     llama_pack3(model, quantizers)
-        #     torch.save(model.state_dict(), save_file)
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            llama_pack3(model, quantizers)
+            torch.save(model.state_dict(), save_file)
    
     elif args.method == 'billm':
         from gptq.bigptq import BRAGPTQ
@@ -2223,12 +2405,19 @@ if __name__ == '__main__':
         llama_sequential_billm(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_lq_method{args.low_quant_method}_groupsz{groupsize}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
@@ -2247,13 +2436,20 @@ if __name__ == '__main__':
         if args.use_zfold:
             z_folding(model, quantizers)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
         
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
+
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_actorder_{args.act_order}_zfold_{args.use_zfold}_wbits{args.wbits}_salient_{args.salient_metric}_seed{args.seed}"
             save_file = "./qmodel/" + save_title + ".pt"
@@ -2268,12 +2464,19 @@ if __name__ == '__main__':
         quantizers = llama_sequential_claq(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+        
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2289,12 +2492,19 @@ if __name__ == '__main__':
         llama_sequential_pbllm(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_lowfeac{args.low_frac}_highbit{args.high_bit}_seed{args.seed}"
@@ -2310,12 +2520,19 @@ if __name__ == '__main__':
         llama_sequential_quip(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2341,16 +2558,19 @@ if __name__ == '__main__':
         llama_sequential_slim(model, dataloader, DEV, block_precision)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
         
-        if args.tasks != "":
-            from eval_ppl_utils import zeroshot_evaluate
-            zeroshot_evaluate(args, model, DEV)
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2366,12 +2586,19 @@ if __name__ == '__main__':
         quantizers = llama_sequential_awrq(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2387,12 +2614,19 @@ if __name__ == '__main__':
         llama_sequential_gptvq(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2409,12 +2643,19 @@ if __name__ == '__main__':
         llama_sequential_decoupleq(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2433,12 +2674,19 @@ if __name__ == '__main__':
         llama_sequential_owq(model, meta, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2454,12 +2702,19 @@ if __name__ == '__main__':
         llama_sequential_magr(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
@@ -2474,12 +2729,53 @@ if __name__ == '__main__':
         llama_sequential_spqr(model, dataloader, DEV)
         logger.info(time.time() - tick)
 
-        for dataset in ['wikitext2', 'ptb', 'c4']:
+        for dataset in ['wikitext2', 'c4']:
             dataloader, testloader = get_loaders(
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             logger.info(dataset)
             llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
+
+        if args.save:
+            save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"
+            save_file = "./qmodel/" + save_title + ".pt"
+            torch.save(model.state_dict(), save_file)
+
+    elif args.method == 'qeft':
+        from gptq.qeft.misc import *
+        from gptq.qeft.qeft_owq import OWQ_GPTQ
+        from gptq.qeft.qeft_quant import Quantizer
+        from eval_ppl_utils import llama_eval_ppl
+
+        # 1. extract global indices
+        meta = processing_arguments(args)
+        args.meta = meta
+        extract_outlieridx(model, dataloader, DEV, args)
+
+        tick = time.time()
+        llama_sequential_qeft(model, dataloader, DEV)
+        logger.info(time.time() - tick)
+
+        for dataset in ['wikitext2', 'c4']:
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            logger.info(dataset)
+            llama_eval_ppl(args, model, testloader, DEV, logger)
+
+        if args.eval_zeroshot:
+            from eval import eval_zero_shot
+            logger.info("zero_shot evaluation")
+    
+            num_shot = 0
+            eval_zero_shot(args, model, tokenizer, logger, args.task_list, num_shot)
 
         if args.save:
             save_title = f"dataset_{args.dataset}_{args.method}_wbits{args.wbits}_seed{args.seed}"

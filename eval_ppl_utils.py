@@ -56,7 +56,7 @@ def llama_eval_ppl(args, model, testenc, dev, logger):
 
     for i in range(len(layers)):
         logger.info(f'================={i}==================')
-        hf_device = f"cuda:{hf_device_map[f'model.layers.{i}']}"
+        hf_device = "cuda:0" if len(hf_device_map) == 1 and '' in hf_device_map else f"cuda:{hf_device_map[f'model.layers.{i}']}"
         layer = layers[i].to(hf_device)
         inps = inps.to(hf_device)
         position_ids = position_ids.to(hf_device)
@@ -107,56 +107,35 @@ def llama_eval_ppl(args, model, testenc, dev, logger):
     model.config.use_cache = use_cache
 
 
-@torch.no_grad()
-def zeroshot_evaluate(args, model, dev, logger):
-    results = {}
-    limit = -1
+def eval_zero_shot(args, model, tokenizer, logger, task_list, num_fewshot=0,  add_special_tokens=False): 
+    import lm_eval
+    from lm_eval import utils as lm_eval_utils
+    from lm_eval.models.huggingface import HFLM
+    from tempfile import TemporaryDirectory
 
-    if "opt" in args.model.lower():
-        model.model = model.model.to(dev)
-    elif "llama" in args.model.lower() or "mixtral" in args.model.lower():
-        model = model.to(dev)
-    elif "falcon" in args.model.lower():
-        model.transformer = model.transformer.to(dev)
+    with TemporaryDirectory() as tmpdir:
+        # 1. 把模型瞬时导出
+        model.save_pretrained(tmpdir, safe_serialization=True)
+        tokenizer.save_pretrained(tmpdir)
 
-    if args.tasks != "":
-        from utils.LMClass import LMClass
-        lm = LMClass(model, args)
+        hflm = HFLM(
+            pretrained=tmpdir, 
+            tokenizer=tokenizer, 
+            batch_size=args.lm_eval_batch_size,
+            parallelize=True)
+        
+        ALL_TASKS = ["piqa", "copa", "boolq", "rte", "hellaswag", "winogrande", "arc_easy", "arc_challenge", "openbookqa"]
+        task_names = lm_eval_utils.pattern_match(task_list, ALL_TASKS)
+        print(f"Matched Tasks: {task_names}")
+        if not task_names:
+            raise ValueError("No tasks matched. Check task names!")
 
-        t_results = evaluator.simple_evaluate(
-            lm,
-            tasks=args.tasks,
-            num_fewshot=0,
-            limit=None if limit == -1 else limit,
+        results = lm_eval.simple_evaluate(
+            model=hflm, 
+            tasks=task_names, 
+            num_fewshot=num_fewshot,
+            batch_size=args.lm_eval_batch_size
         )
-        results.update(t_results)
-        logger.info(results)
-        # for test of MMLU
-        if 'hendrycksTest' in args.tasks:
-            all_cors = []
-            all_cors_norm = []
-            subcat_cors = {subcat: [] for subcat_lists in subcategories.values() for subcat in subcat_lists}
-            cat_cors = {cat: [] for cat in categories}
-            cat_cors_norm = {cat: [] for cat in categories}
-            for key in t_results['results'].keys():
-                if not 'hendrycksTest' in key:
-                    continue
-                subject = key.split('-')[-1]
-                cors = t_results['results'][key]['acc']
-                cors_norm = t_results['results'][key]['acc_norm']
-                subcats = subcategories[subject]
-                for subcat in subcats:
-                    subcat_cors[subcat].append(cors)
-                    for key in categories.keys():
-                        if subcat in categories[key]:
-                            cat_cors[key].append(cors)
-                            cat_cors_norm[key].append(cors_norm)
-                    all_cors.append(cors)
-                    all_cors_norm.append(cors_norm)
-                    
-            for cat in cat_cors:
-                cat_acc = np.mean(cat_cors[cat])
-                logger.info("Average accuracy {:.4f} - {}".format(cat_acc, cat))
-            weighted_acc = np.mean(all_cors)
-            logger.info("Average accuracy: {:.4f}".format(weighted_acc))               
-    logger.info(results)
+
+        metric_vals = process_eval_results(results, logger)
+        logger.info(f"{args.wbits} - {args.act_bits} - Evaluation Results: {metric_vals}")
